@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">CycleFlow</string>
+
+    <!-- Main Activity -->
+    <string name="latitude_label">Latitude</string>
+    <string name="longitude_label">Longitude</string>
+
+    <string name="current_speed_label">Current Speed</string>
+    <string name="current_speed_accuracy_label">Current Speed Accuracy</string>
+
+    <string name="bearing_label">Bearing</string>
+    <string name="bearing_accuracy_label">Bearing Accuracy</string>
+
+    <string name="last_update_time_label">Last location update time</string>
+
+    <string name="distance_to_instersection_label">Distance to intersection</string>
+
+    <!-- Next activity... -->
+</resources>
