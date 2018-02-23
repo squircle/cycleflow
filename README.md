@@ -4,7 +4,7 @@
   
       .-``'.      _o
     .`   .`    _ \<_
-_.-'     '.__((_)/(_)______________
+_.-'     '.___(_)/(_)______________
 synergysynergysynergysynergysynergy
 ```
 Capstone project for CEG 4912/4913 at the University of Ottawa
