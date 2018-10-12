@@ -2,18 +2,30 @@
     <string name="app_name">CycleFlow</string>
 
     <!-- Main Activity -->
-    <string name="latitude_label">Latitude</string>
-    <string name="longitude_label">Longitude</string>
+    <string name="latitude_label">Latitude:</string>
+    <string name="longitude_label">Longitude:</string>
 
-    <string name="current_speed_label">Current Speed</string>
-    <string name="current_speed_accuracy_label">Current Speed Accuracy</string>
+    <string name="current_speed_label">Current Speed:</string>
+    <string name="current_speed_accuracy_label">Current Speed Accuracy:</string>
 
-    <string name="bearing_label">Bearing</string>
-    <string name="bearing_accuracy_label">Bearing Accuracy</string>
+    <string name="bearing_label">Bearing:</string>
+    <string name="bearing_accuracy_label">Bearing Accuracy:</string>
 
-    <string name="last_update_time_label">Last location update time</string>
+    <string name="last_update_time_label">Last location update time:</string>
 
-    <string name="distance_to_instersection_label">Distance to intersection</string>
+    <string name="distance_to_intersection_label">Distance to intersection:</string>
+
+    <string name="title_1_label">Location Information:</string>
+    <string name="title_2_label">Bluetooth Information:</string>
+
+    <string name="ble_device_uuid_label">BLE Device UUID:</string>
+    <string name="street_1_label">Street 1 Name:</string>
+    <string name="street_2_label">Street 2 Name:</string>
+    <string name="street_3_label">Street 3 Name:</string>
+    <string name="street_4_label">Street 4 Name:</string>
+    <string name="light_timer_label">Light Timer State:</string>
 
     <!-- Next activity... -->
+
+
 </resources>

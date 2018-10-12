@@ -2,15 +2,28 @@ package ca.cloudsynergy.cycleflow;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.ListActivity;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelUuid;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import ca.cloudsynergy.cycleflow.trafficsim.GpsCoordinates;
 import ca.cloudsynergy.cycleflow.trafficsim.IntersectionInfo;
@@ -24,19 +37,33 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
 
     // Permission Requests
     private final int PR_FINE_LOCATION = 0;
+    private static final int PR_ENABLE_BT = 2;
 
     // Wireless Information
     private static Queue<IntersectionInfo> recievedData;
+
+    // Bluetooth
+    private BluetoothAdapter mBluetoothAdapter;
+    BluetoothLeScanner bluetoothLeScanner;
+    private boolean mScanning; // currently scanning
+    private Handler mHandler = new Handler(); // handler for scanning
+
+    // Valid Master UUID info
+    String validUUIDStart = "CC9D";
+    String validUUIDEnd = "-55D1-4F78-89F4-4D0EAAB24FED";
 
     // GPS Location information
     protected Location currentLocation;
@@ -47,16 +74,6 @@ public class MainActivity extends AppCompatActivity {
     private FusedLocationProviderClient fusedLocationClient;
     private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
     private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
-
-    // Labels
-    private String latitudeLabel;
-    private String longitudeLabel;
-    private String currentSpeedLabel;
-    private String currentSpeedAccuracyLabel;
-    private String bearingLabel;
-    private String bearingAccuracyLabel;
-    private String lastUpdateTimeLabel;
-    private String distanceToInstersectionLabel;
 
     // UI Widgets
     private TextView latitudeTextView;
@@ -79,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
         lastUpdateTime = "";
         recievedData = new LinkedList<>();
 
-        assignLabels();
+        // Link view elements to objects by label
         assignWidgets();
 
         // TODO: Maybe change this to follow the use of buttons or something.
@@ -92,39 +109,48 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void assignLabels() {
-        latitudeLabel = getResources().getString(R.string.latitude_label);
-        longitudeLabel = getResources().getString(R.string.longitude_label);
-        currentSpeedLabel = getResources().getString(R.string.current_speed_label);
-        currentSpeedAccuracyLabel = getResources().getString(R.string.current_speed_accuracy_label);
-        bearingLabel = getResources().getString(R.string.bearing_label);
-        bearingAccuracyLabel = getResources().getString(R.string.bearing_accuracy_label);
-        lastUpdateTimeLabel = getResources().getString(R.string.last_update_time_label);
-        distanceToInstersectionLabel = getResources().getString(R.string.distance_to_instersection_label);
-    }
-
     private void assignWidgets() {
-        latitudeTextView = findViewById(R.id.latitude_text);
-        longitudeTextView = findViewById(R.id.longitude_text);
-        currentSpeedTextView = findViewById(R.id.current_speed_text);
-        currentSpeedAccuracyTextView = findViewById(R.id.current_speed_accuracy_text);
-        bearingTextView = findViewById(R.id.bearing_text);
-        bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_text);
-        lastUpdateTimeTextView = findViewById(R.id.last_update_time_text);
-        distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_text);
+        latitudeTextView = findViewById(R.id.latitude_data);
+        longitudeTextView = findViewById(R.id.longitude_data);
+        currentSpeedTextView = findViewById(R.id.current_speed_data);
+        currentSpeedAccuracyTextView = findViewById(R.id.current_speed_accuracy_data);
+        bearingTextView = findViewById(R.id.bearing_data);
+        bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_data);
+        lastUpdateTimeTextView = findViewById(R.id.last_update_time_data);
+        distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_data);
     }
 
     @Override
     public void onStart() {
         super.onStart();
 
-        // Request permissions and get the last known location if permissions are granted.
+        // Handle Bluetooth adapter/scanner
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (mBluetoothAdapter == null) {
+            Toast.makeText(this, "Bluetooth is unavailable", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        bluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+
+        // Request location permissions and get the last known location if permissions are granted.
         if (!checkPermissions()) {
             requestPermissions();
         } else {
             requestingLocationUpdates = true;
             getLastLocation();
         }
+
+        // Request bluetooth to be enabled if it is not already
+        if (!mBluetoothAdapter.isEnabled()) {
+            Log.i(TAG, "Bluetooth not enabled yet");
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableIntent, PR_ENABLE_BT);
+        }
+
+        // Scan for LE Devices
+        scanLeDevice(true);
+
     }
 
     @Override
@@ -163,26 +189,20 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, currentLocation.hasSpeed() + "");
             Log.d(TAG, "HAS BEARING: " + currentLocation.hasBearing());
             */
-            latitudeTextView.setText(String.format(Locale.ENGLISH, "%s: %f", latitudeLabel,
-                    currentLocation.getLatitude()));
-            longitudeTextView.setText(String.format(Locale.ENGLISH, "%s: %f", longitudeLabel,
-                    currentLocation.getLongitude()));
-            currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%s: %f m/s", currentSpeedLabel,
-                    currentLocation.getSpeed()));
-            currentSpeedAccuracyTextView.setText(String.format(Locale.ENGLISH, "%s: NEED MIN API OF 26", currentSpeedAccuracyLabel));
-            bearingTextView.setText(String.format(Locale.ENGLISH, "%s: %f degrees", bearingLabel,
-                    currentLocation.getBearing()));
-            bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "%s: NEED MIN API OF 26", bearingAccuracyLabel));
-            lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s: %s", lastUpdateTimeLabel,
-                    lastUpdateTime));
+            latitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLatitude()));
+            longitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLongitude()));
+            currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%f m/s", currentLocation.getSpeed()));
+            currentSpeedAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26", currentLocation));
+            bearingTextView.setText(String.format(Locale.ENGLISH, "%f degrees", currentLocation.getBearing()));
+            bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26"));
+            lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s", lastUpdateTime));
 
             //TODO Move this next section to be called from somewhere else, like handle the information as you get it instead.
             while(!recievedData.isEmpty()) {
                 IntersectionInfo intersectionInfo = recievedData.remove();
                 // TODO: At this time only using one intersection, eventually will be mapped to an object or something. Once mapped the bellow needs to be changed to prevent constant overwrites
                 GpsCoordinates location = new GpsCoordinates(currentLocation.getLatitude(), currentLocation.getLongitude());
-                distanceToIntersectionTextView.setText(String.format(Locale.ENGLISH, "%s: %f meters",
-                        distanceToInstersectionLabel,
+                distanceToIntersectionTextView.setText(String.format(Locale.ENGLISH, "%f metres",
                         GpsCoordinates.calculateDistance(location, intersectionInfo.getGpsCoordinates())));
             }
         }
@@ -226,6 +246,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestPermissions() {
+
         boolean shouldProvideRationale =
                 ActivityCompat.shouldShowRequestPermissionRationale(this,
                         Manifest.permission.ACCESS_FINE_LOCATION);
@@ -256,7 +277,7 @@ public class MainActivity extends AppCompatActivity {
         switch (requestCode) {
             case (PR_FINE_LOCATION):
                 if (grantResults.length <= 0) {
-                    // User interaction interuppted, arrays will be empty
+                    // User interaction interrupted, arrays will be empty
                     Log.i(TAG, "User interaction was cancelled.");
                 } else if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.i(TAG, "Permission Granted.");
@@ -267,6 +288,17 @@ public class MainActivity extends AppCompatActivity {
                     // Permission Denied.
                     Log.i(TAG, "Permission Denied.");
                     // TODO: Handle this.
+                }
+                break;
+            case PR_ENABLE_BT:
+                // When the request to enable Bluetooth returns
+                if (grantResults[0] == Activity.RESULT_OK) {
+                    Toast.makeText(this, "Bluetooth enabled", Toast.LENGTH_SHORT).show();
+                } else {
+                    // User did not enable Bluetooth or an error occurred
+                    Log.d(TAG, "Error enabling Bluetooth");
+                    Toast.makeText(this, "Error enabling Bluetooth", Toast.LENGTH_SHORT).show();
+                    finish();
                 }
                 break;
             default:
@@ -280,4 +312,107 @@ public class MainActivity extends AppCompatActivity {
     public static void ReceiveInformation(IntersectionInfo intersectionInfo) {
         recievedData.add(intersectionInfo);
     }
+
+
+    //-------------------------
+    // BLE
+
+    /**
+     * Scan and display available BLE devices.
+     */
+    private void scanLeDevice(final boolean enable) {
+        if (enable) {
+            // Stops scanning after 10 seconds.
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    mScanning = false;
+                    bluetoothLeScanner.stopScan(mLeScanCallback);
+                }
+            }, 10000);
+
+            // Using highest-power mode for scanning
+            ScanSettings scanSettings = new ScanSettings.Builder()
+                    .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .build();
+            // Not using filters due to many reported bugs in Android
+            // Supposed to filter manually
+            ArrayList<ScanFilter> filters = new ArrayList<ScanFilter>();
+
+            mScanning = true;
+            bluetoothLeScanner.startScan(filters, scanSettings, mLeScanCallback);
+        } else {
+            mScanning = false;
+            bluetoothLeScanner.stopScan(mLeScanCallback);
+        }
+    }
+
+    /**
+     * Callback for BLE scanner
+     */
+    private ScanCallback mLeScanCallback = new ScanCallback() {
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            Log.i("callbackType", String.valueOf(callbackType));
+            Log.i("result", result.toString());
+            String uuid = getUUID(result);
+            Log.i("UUID", uuid);
+
+            String uStart = "";
+            String uEnd = "";
+            try{
+                uStart = uuid.substring(0, Math.min(uuid.length(), 5));
+                uEnd = uuid.substring(uuid.length() - 29);
+            }catch (Exception e){
+                Log.d("VerifyUUID", "Error verifying UUID.");
+            }
+
+            if(!uuid.equals("") && !uStart.equals("") && !uEnd.equals("")){
+                Log.i("Split UUID Start", uStart);
+                Log.i("Split UUID End", uEnd);
+                // verify if the UUID is a match
+                if(uStart.equals(validUUIDStart) && uEnd.equals(validUUIDEnd)){
+                    // valid match - end the scanning process
+                    scanLeDevice(false);
+
+
+
+
+                }
+            }
+
+            super.onScanResult(callbackType, result);
+        }
+
+        @Override
+        public void onBatchScanResults(List<ScanResult> results) {
+            for (ScanResult sr : results) {
+                Log.i("ScanResult - Results", sr.toString());
+                Log.i("UUID", getUUID(sr));
+            }
+            super.onBatchScanResults(results);
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            super.onScanFailed(errorCode);
+        }
+    };
+
+    public String getUUID(ScanResult result){
+        String UUIDx = "";
+        try{
+            UUIDx = result.getScanRecord().getServiceUuids().toString();
+        } catch (Exception e){
+            Log.e("getUUID", "Null result.");
+        }
+        Log.i("getUUID", " as String ->>" + UUIDx);
+        return UUIDx;
+    }
+
+
+
+
+
+
 }
