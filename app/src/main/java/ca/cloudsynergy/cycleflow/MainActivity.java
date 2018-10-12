@@ -3,20 +3,23 @@ package ca.cloudsynergy.cycleflow;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.ListActivity;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
-import android.os.ParcelUuid;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -43,8 +46,15 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
-import java.util.UUID;
-
+/*
+ * Main class for CycleFlow Android Application
+ *
+ * Some code based on DeviceControlActivity.java from Google Samples on Github:
+ * https://github.com/googlesamples/android-BluetoothLeGatt/
+ *
+ * @author Mitchell Kovacs
+ * @author Noah Kruiper
+ */
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -55,11 +65,16 @@ public class MainActivity extends AppCompatActivity {
     // Wireless Information
     private static Queue<IntersectionInfo> recievedData;
 
-    // Bluetooth
+    // Bluetooth Scanning
     private BluetoothAdapter mBluetoothAdapter;
     BluetoothLeScanner bluetoothLeScanner;
     private boolean mScanning; // currently scanning
     private Handler mHandler = new Handler(); // handler for scanning
+
+    // BLE Service
+    private BluetoothLeService mBluetoothLeService;
+    private String mDeviceAddress;
+    private boolean mConnected = false;
 
     // Valid Master UUID info
     String validUUIDStart = "CC9D";
@@ -98,6 +113,9 @@ public class MainActivity extends AppCompatActivity {
 
         // Link view elements to objects by label
         assignWidgets();
+
+        // Setup BLE service
+        setupService();
 
         // TODO: Maybe change this to follow the use of buttons or something.
         requestingLocationUpdates = false; // Wait until permissions have been set.
@@ -154,11 +172,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(mGattUpdateReceiver);
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         if (requestingLocationUpdates) {
             startLocationUpdates();
         }
+        registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
+        if (mBluetoothLeService != null && mDeviceAddress != null) {
+            final boolean result = mBluetoothLeService.connect(mDeviceAddress);
+            Log.d(TAG, "Connect request result=" + result);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unbindService(mServiceConnection);
+        mBluetoothLeService = null;
     }
 
     private void createLocationRequest() {
@@ -355,7 +391,7 @@ public class MainActivity extends AppCompatActivity {
         public void onScanResult(int callbackType, ScanResult result) {
             Log.i("callbackType", String.valueOf(callbackType));
             Log.i("result", result.toString());
-            String uuid = getUUID(result);
+            String uuid = Utility.getUuidFromResult(result);
             Log.i("UUID", uuid);
 
             String uStart = "";
@@ -373,14 +409,18 @@ public class MainActivity extends AppCompatActivity {
                 // verify if the UUID is a match
                 if(uStart.equals(validUUIDStart) && uEnd.equals(validUUIDEnd)){
                     // valid match - end the scanning process
+                    // TODO - maybe you can do both at once?
+                    // TODO ensure this method call does not cause problems since it comes back here
                     scanLeDevice(false);
 
+                    // TODO
+                    mDeviceAddress = "";
 
-
+                    // here would be where we activate the connection
+                    mBluetoothLeService.connect(mDeviceAddress);
 
                 }
             }
-
             super.onScanResult(callbackType, result);
         }
 
@@ -388,7 +428,7 @@ public class MainActivity extends AppCompatActivity {
         public void onBatchScanResults(List<ScanResult> results) {
             for (ScanResult sr : results) {
                 Log.i("ScanResult - Results", sr.toString());
-                Log.i("UUID", getUUID(sr));
+                Log.i("UUID", Utility.getUuidFromResult(sr));
             }
             super.onBatchScanResults(results);
         }
@@ -399,20 +439,61 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    public String getUUID(ScanResult result){
-        String UUIDx = "";
-        try{
-            UUIDx = result.getScanRecord().getServiceUuids().toString();
-        } catch (Exception e){
-            Log.e("getUUID", "Null result.");
-        }
-        Log.i("getUUID", " as String ->>" + UUIDx);
-        return UUIDx;
+
+    public void setupService(){
+        Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
+        bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
     }
 
+    // Code to manage Service lifecycle.
+    private final ServiceConnection mServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder service) {
+            mBluetoothLeService = ((BluetoothLeService.LocalBinder) service).getService();
+            if (!mBluetoothLeService.initialize()) {
+                Log.e(TAG, "Unable to initialize Bluetooth");
+                finish();
+            }
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+            mBluetoothLeService = null;
+        }
+    };
 
+    // Handles various events fired by the Service.
+    // ACTION_GATT_CONNECTED: connected to a GATT server.
+    // ACTION_GATT_DISCONNECTED: disconnected from a GATT server.
+    // ACTION_GATT_SERVICES_DISCOVERED: discovered GATT services.
+    // ACTION_DATA_AVAILABLE: received data from the device.  This can be a result of read
+    //                        or notification operations.
+    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+            if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
+                mConnected = true;
+                // TODO
+            } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
+                mConnected = false;
+                // TODO
+            } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
+                // TODO
 
+            } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
+                // TODO
+            }
+        }
+    };
 
+    private static IntentFilter makeGattUpdateIntentFilter() {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
+        intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
+        return intentFilter;
+    }
 
 
 }

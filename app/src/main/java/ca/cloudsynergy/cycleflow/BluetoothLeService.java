@@ -22,7 +22,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -124,9 +123,27 @@ public class BluetoothLeService extends Service {
                                  final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
 
-        // This is special handling for the Heart Rate Measurement profile.  Data parsing is
-        // carried out as per profile specifications:
-        // http://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_measurement.xml
+        String strUUID = characteristic.getUuid().toString();
+
+        // we can assume the start and end of the UUID match our global UUID
+        // TODO must verify these substring indices are correct
+        String serviceID = strUUID.substring(5, 7);
+        String charID = strUUID.substring(7, 9);
+
+        switch (serviceID){
+            case "08":
+                // DESCRIPTION OF INTERSECTION
+                break;
+            case "0C":
+                // TIMING INFORMATION
+                break;
+            default:
+                // UNDEFINED SERVICE
+                break;
+        }
+
+        // This is special handling for the Heart Rate Measurement profile
+        // PRESERVED FOR REFERENCE
         if (UUID_HEART_RATE_MEASUREMENT.equals(characteristic.getUuid())) {
             int flag = characteristic.getProperties();
             int format = -1;
@@ -233,8 +250,7 @@ public class BluetoothLeService extends Service {
             Log.w(TAG, "Device not found.  Unable to connect.");
             return false;
         }
-        // We want to directly connect to the device, so we are setting the autoConnect
-        // parameter to false.
+        // We want to directly connect to the device, so we are setting the autoConnect parameter to false.
         mBluetoothGatt = device.connectGatt(this, false, mGattCallback);
         Log.d(TAG, "Trying to create a new connection.");
         mBluetoothDeviceAddress = address;
