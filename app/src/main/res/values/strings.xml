@@ -18,12 +18,12 @@
     <string name="title_1_label">Location Information:</string>
     <string name="title_2_label">Bluetooth Information:</string>
 
-    <string name="ble_device_uuid_label">BLE Device UUID:</string>
-    <string name="street_1_label">Street 1 Name:</string>
-    <string name="street_2_label">Street 2 Name:</string>
-    <string name="street_3_label">Street 3 Name:</string>
-    <string name="street_4_label">Street 4 Name:</string>
-    <string name="light_timer_label">Light Timer State:</string>
+    <string name="approach_station_name">Name:</string>
+    <string name="approach_station_lat">Latitude:</string>
+    <string name="approach_station_long">Longitude:</string>
+    <string name="approach_station_rssi">RSSI:</string>
+    <string name="approach_station_num_entrances">Entrances:</string>
+
 
     <!-- Next activity... -->
 

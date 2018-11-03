@@ -7,18 +7,13 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
-import android.content.BroadcastReceiver;
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -43,7 +38,6 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
 /*
@@ -71,14 +65,11 @@ public class MainActivity extends AppCompatActivity {
     private boolean mScanning; // currently scanning
     private Handler mHandler = new Handler(); // handler for scanning
 
-    // BLE Service
-    private BluetoothLeService mBluetoothLeService;
-    private String mDeviceAddress;
-    private boolean mConnected = false;
-
-    // Valid Master UUID info
-    String validUUIDStart = "CC9D";
-    String validUUIDEnd = "-55D1-4F78-89F4-4D0EAAB24FED";
+    // Station Info
+    StationInfo approachStation; // Selected approach station
+    StationInfo passedStation; // Previously-crossed intersection
+    ArrayList<StationInfo> currentScanList = new ArrayList<>(); // Current list being populated/updated by scanner
+    ArrayList<StationInfo> lastScanList = new ArrayList<>(); // List from previous scan
 
     // GPS Location information
     protected Location currentLocation;
@@ -99,8 +90,12 @@ public class MainActivity extends AppCompatActivity {
     private TextView bearingAccuracyTextView;
     private TextView lastUpdateTimeTextView;
     private TextView distanceToIntersectionTextView;
-
-
+    private TextView approachStationRawDataTextView;
+    private TextView approachStationNameTextView;
+    private TextView approachStationLatTextView;
+    private TextView approachStationLongTextView;
+    private TextView approachStationRssiTextView;
+    private TextView approachStationNumEntrancesTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,9 +108,6 @@ public class MainActivity extends AppCompatActivity {
 
         // Link view elements to objects by label
         assignWidgets();
-
-        // Setup BLE service
-        setupService();
 
         // TODO: Maybe change this to follow the use of buttons or something.
         requestingLocationUpdates = false; // Wait until permissions have been set.
@@ -136,6 +128,12 @@ public class MainActivity extends AppCompatActivity {
         bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_data);
         lastUpdateTimeTextView = findViewById(R.id.last_update_time_data);
         distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_data);
+        approachStationRawDataTextView = findViewById(R.id.approach_station_raw_data);
+        approachStationNameTextView = findViewById(R.id.approach_station_name_data);
+        approachStationLatTextView = findViewById(R.id.approach_station_lat_data);
+        approachStationLongTextView = findViewById(R.id.approach_station_long_data);
+        approachStationRssiTextView = findViewById(R.id.approach_station_rssi_data);
+        approachStationNumEntrancesTextView = findViewById(R.id.approach_station_num_entrances_data);
     }
 
     @Override
@@ -174,7 +172,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        unregisterReceiver(mGattUpdateReceiver);
     }
 
     @Override
@@ -183,18 +180,11 @@ public class MainActivity extends AppCompatActivity {
         if (requestingLocationUpdates) {
             startLocationUpdates();
         }
-        registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
-        if (mBluetoothLeService != null && mDeviceAddress != null) {
-            final boolean result = mBluetoothLeService.connect(mDeviceAddress);
-            Log.d(TAG, "Connect request result=" + result);
-        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unbindService(mServiceConnection);
-        mBluetoothLeService = null;
     }
 
     private void createLocationRequest() {
@@ -358,14 +348,14 @@ public class MainActivity extends AppCompatActivity {
      */
     private void scanLeDevice(final boolean enable) {
         if (enable) {
-            // Stops scanning after 10 seconds.
+            // stops scanning after 10 seconds
             mHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     mScanning = false;
                     bluetoothLeScanner.stopScan(mLeScanCallback);
                 }
-            }, 10000);
+            }, 20000);
 
             // Using highest-power mode for scanning
             ScanSettings scanSettings = new ScanSettings.Builder()
@@ -391,46 +381,59 @@ public class MainActivity extends AppCompatActivity {
         public void onScanResult(int callbackType, ScanResult result) {
             Log.i("callbackType", String.valueOf(callbackType));
             Log.i("result", result.toString());
-            String uuid = Utility.getUuidFromResult(result);
-            Log.i("UUID", uuid);
 
-            String uStart = "";
-            String uEnd = "";
-            try{
-                uStart = uuid.substring(0, Math.min(uuid.length(), 5));
-                uEnd = uuid.substring(uuid.length() - 29);
-            }catch (Exception e){
-                Log.d("VerifyUUID", "Error verifying UUID.");
-            }
+            // the broadcast data from both packets
+            ScanRecord record = result.getScanRecord();
 
-            if(!uuid.equals("") && !uStart.equals("") && !uEnd.equals("")){
-                Log.i("Split UUID Start", uStart);
-                Log.i("Split UUID End", uEnd);
-                // verify if the UUID is a match
-                if(uStart.equals(validUUIDStart) && uEnd.equals(validUUIDEnd)){
-                    // valid match - end the scanning process
-                    // TODO - maybe you can do both at once?
-                    // TODO ensure this method call does not cause problems since it comes back here
-                    scanLeDevice(false);
-
-                    // TODO
-                    mDeviceAddress = "";
-
-                    // here would be where we activate the connection
-                    mBluetoothLeService.connect(mDeviceAddress);
-
+            // Get transmitted bytes
+            byte[] cfData = record.getBytes();
+            // Only if the right bytes match should we attempt to create StationInfo
+            if (cfData != null && cfData[1] == (byte)0xFF && cfData[2] == (byte)0xFF && cfData[3] == (byte)0xFF && cfData[10] == (byte)0xCF) {
+                // Generate String version of received data
+                String text = "";
+                for(int i = 0; i < cfData.length; i++){
+                    text = text + cfData[i];
+                    if(i == cfData.length/2 - 1){
+                        text = text + "\n";
+                    }
                 }
-            }
-            super.onScanResult(callbackType, result);
-        }
+                Log.i("ScanResult", "Scan result data: " + text);
 
-        @Override
-        public void onBatchScanResults(List<ScanResult> results) {
-            for (ScanResult sr : results) {
-                Log.i("ScanResult - Results", sr.toString());
-                Log.i("UUID", Utility.getUuidFromResult(sr));
+                // Try to get info from the station
+                StationInfo info = null;
+                try {
+                    info = StationInfo.StationInfoBuilder(cfData, result.getRssi());
+                } catch (Exception e){
+                    Log.e("ScanResult", "Error creating Station Info.", e);
+                }
+                // If the info already exists, update it to the latest-received data
+                if(info != null){
+                    for(int i = 0; i < currentScanList.size(); i++){
+                        if(currentScanList.get(i).id == info.id){
+                            currentScanList.remove(i);
+                            currentScanList.add(info);
+                            Log.i("ScanResult","Updated station info for " + info.name + " in the currentScanList");
+                        }
+                    }
+                    // If the candidate is more appropriate, update approach station
+                    if(approachStation != null && approachStation.rssi > info.rssi){
+                        approachStation = info;
+                        Log.i("ScanResult","Updated approach station to " + info.name);
+                    }
+                    // Display data
+                    approachStationRawDataTextView.setText(text);
+                    approachStationNameTextView.setText(info.name);
+                    approachStationLatTextView.setText(String.valueOf(info.coordinates.getLatitude()));
+                    approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
+                    approachStationRssiTextView.setText(String.valueOf(info.rssi));
+                    approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
+                }
+
+            } else {
+                Log.i("DATA", "no match");
             }
-            super.onBatchScanResults(results);
+
+            super.onScanResult(callbackType, result);
         }
 
         @Override
@@ -438,62 +441,5 @@ public class MainActivity extends AppCompatActivity {
             super.onScanFailed(errorCode);
         }
     };
-
-
-    public void setupService(){
-        Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
-        bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
-    }
-
-    // Code to manage Service lifecycle.
-    private final ServiceConnection mServiceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName componentName, IBinder service) {
-            mBluetoothLeService = ((BluetoothLeService.LocalBinder) service).getService();
-            if (!mBluetoothLeService.initialize()) {
-                Log.e(TAG, "Unable to initialize Bluetooth");
-                finish();
-            }
-        }
-        @Override
-        public void onServiceDisconnected(ComponentName componentName) {
-            mBluetoothLeService = null;
-        }
-    };
-
-    // Handles various events fired by the Service.
-    // ACTION_GATT_CONNECTED: connected to a GATT server.
-    // ACTION_GATT_DISCONNECTED: disconnected from a GATT server.
-    // ACTION_GATT_SERVICES_DISCOVERED: discovered GATT services.
-    // ACTION_DATA_AVAILABLE: received data from the device.  This can be a result of read
-    //                        or notification operations.
-    private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            final String action = intent.getAction();
-            if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
-                mConnected = true;
-                // TODO
-            } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
-                mConnected = false;
-                // TODO
-            } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
-                // TODO
-
-            } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
-                // TODO
-            }
-        }
-    };
-
-    private static IntentFilter makeGattUpdateIntentFilter() {
-        final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
-        intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
-        intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
-        return intentFilter;
-    }
-
 
 }
