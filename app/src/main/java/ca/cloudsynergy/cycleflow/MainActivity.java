@@ -7,7 +7,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
@@ -34,9 +33,12 @@ import com.google.android.gms.tasks.Task;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
-import ca.cloudsynergy.cycleflow.trafficsim.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.station.StationInfo;
 
 /*
  * Main class for CycleFlow Android Application
@@ -61,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler = new Handler(); // handler for scanning
 
     // Station Info
+    Map<String, StationInfo> stations;
     StationInfo approachStation; // Selected approach station
     StationInfo passedStation; // Previously-crossed intersection
     ArrayList<StationInfo> currentScanList = new ArrayList<>(); // Current list being populated/updated by scanner
@@ -105,6 +108,8 @@ public class MainActivity extends AppCompatActivity {
 
         // TODO: Maybe change this to follow the use of buttons or something.
         requestingLocationUpdates = false; // Wait until permissions have been set.
+
+        stations = new HashMap<>();
 
         createLocationCallback();
         createLocationRequest();
@@ -356,13 +361,13 @@ public class MainActivity extends AppCompatActivity {
             Log.i("callbackType", String.valueOf(callbackType));
             Log.i("result", result.toString());
 
-            // the broadcast data from both packets
-            ScanRecord record = result.getScanRecord();
+            // Get transmitted bytes from the broadcast data from both packets
+            byte [] cfData = result.getScanRecord().getBytes();
 
-            // Get transmitted bytes
-            byte[] cfData = record.getBytes();
             // Only if the right bytes match should we attempt to create StationInfo
             if (cfData != null && cfData[1] == (byte)0xFF && cfData[2] == (byte)0xFF && cfData[3] == (byte)0xFF && cfData[10] == (byte)0xCF) {
+
+                /*
                 // Generate String version of received data
                 String text = "";
                 for(int i = 0; i < cfData.length; i++){
@@ -372,11 +377,13 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
                 Log.i("ScanResult", "Scan result data: " + text);
+                */
 
                 // Try to get info from the station
                 StationInfo info = null;
                 try {
                     info = StationInfo.StationInfoBuilder(cfData, result.getRssi());
+                    info.time = result.getTimestampNanos();
                 } catch (Exception e){
                     Log.e("ScanResult", "Error creating Station Info.", e);
                 }
@@ -395,7 +402,7 @@ public class MainActivity extends AppCompatActivity {
                         Log.i("ScanResult","Updated approach station to " + info.name);
                     }
                     // Display data
-                    approachStationRawDataTextView.setText(text);
+                    // approachStationRawDataTextView.setText(text);
                     approachStationNameTextView.setText(info.name);
                     approachStationLatTextView.setText(String.valueOf(info.coordinates.getLatitude()));
                     approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
@@ -408,6 +415,10 @@ public class MainActivity extends AppCompatActivity {
                                 info.coordinates)));
                     }
                 }
+
+                // Create station map key based on longitude and latitude
+                String key = String.valueOf(info.coordinates.getLatitude()) + String.valueOf(info.coordinates.getLongitude());
+                stations.put(key, info);
 
             } else {
                 Log.i("DATA", "no match");

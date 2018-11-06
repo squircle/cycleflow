@@ -1,4 +1,4 @@
-package ca.cloudsynergy.cycleflow.trafficsim;
+package ca.cloudsynergy.cycleflow.location;
 
 /**
  * Created by Mitchell Kovacs on 2018-01-19.

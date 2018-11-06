@@ -1,11 +1,10 @@
-package ca.cloudsynergy.cycleflow;
+package ca.cloudsynergy.cycleflow.station;
 
-import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Objects;
 
-import ca.cloudsynergy.cycleflow.trafficsim.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
 
 public class StationInfo {
     public String id;
@@ -13,6 +12,7 @@ public class StationInfo {
     public String name;
     public int rssi;
     public int numEntrances;
+    public long time;
 
     // Lat/long conversion factors
     public static final long LATLONG_INT_OFFSET = 8388540;
