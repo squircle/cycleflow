@@ -23,9 +23,6 @@ import android.util.Log;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import ca.cloudsynergy.cycleflow.trafficsim.GpsCoordinates;
-import ca.cloudsynergy.cycleflow.trafficsim.IntersectionInfo;
-import ca.cloudsynergy.cycleflow.trafficsim.TrafficSim;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -37,9 +34,8 @@ import com.google.android.gms.tasks.Task;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedList;
 import java.util.Locale;
-import java.util.Queue;
+
 /*
  * Main class for CycleFlow Android Application
  *
@@ -55,9 +51,6 @@ public class MainActivity extends AppCompatActivity {
     // Permission Requests
     private final int PR_FINE_LOCATION = 0;
     private static final int PR_ENABLE_BT = 2;
-
-    // Wireless Information
-    private static Queue<IntersectionInfo> recievedData;
 
     // Bluetooth Scanning
     private BluetoothAdapter mBluetoothAdapter;
@@ -104,7 +97,6 @@ public class MainActivity extends AppCompatActivity {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         lastUpdateTime = "";
-        recievedData = new LinkedList<>();
 
         // Link view elements to objects by label
         assignWidgets();
@@ -112,11 +104,8 @@ public class MainActivity extends AppCompatActivity {
         // TODO: Maybe change this to follow the use of buttons or something.
         requestingLocationUpdates = false; // Wait until permissions have been set.
 
-        TrafficSim.StartSim();
-
         createLocationCallback();
         createLocationRequest();
-
     }
 
     private void assignWidgets() {
@@ -222,15 +211,6 @@ public class MainActivity extends AppCompatActivity {
             bearingTextView.setText(String.format(Locale.ENGLISH, "%f degrees", currentLocation.getBearing()));
             bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26"));
             lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s", lastUpdateTime));
-
-            //TODO Move this next section to be called from somewhere else, like handle the information as you get it instead.
-            while(!recievedData.isEmpty()) {
-                IntersectionInfo intersectionInfo = recievedData.remove();
-                // TODO: At this time only using one intersection, eventually will be mapped to an object or something. Once mapped the bellow needs to be changed to prevent constant overwrites
-                GpsCoordinates location = new GpsCoordinates(currentLocation.getLatitude(), currentLocation.getLongitude());
-                distanceToIntersectionTextView.setText(String.format(Locale.ENGLISH, "%f metres",
-                        GpsCoordinates.calculateDistance(location, intersectionInfo.getGpsCoordinates())));
-            }
         }
     }
 
@@ -331,14 +311,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.e(TAG, "Unhandled requestCode.");
         }
     }
-
-
-    // Very basic example method for receiving information. Will be heavily changed/removed
-    // when an actual protocol is used.
-    public static void ReceiveInformation(IntersectionInfo intersectionInfo) {
-        recievedData.add(intersectionInfo);
-    }
-
 
     //-------------------------
     // BLE
