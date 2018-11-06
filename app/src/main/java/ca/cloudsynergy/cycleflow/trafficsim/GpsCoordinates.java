@@ -38,13 +38,12 @@ public class GpsCoordinates {
         this.longitude = longitude;
     }
 
-    // TODO: Verify the accuracy of this calculation.
     // Returns the distance in meters.
     public static double calculateDistance(GpsCoordinates point1, GpsCoordinates point2) {
         double lat1 = point1.getLatitude();
         double lon1 = point1.getLongitude();
         double lat2 = point2.getLatitude();
-        double lon2 = point2.getLatitude();
+        double lon2 = point2.getLongitude();
 
         final int R = 6371; // Radius of the earth
 

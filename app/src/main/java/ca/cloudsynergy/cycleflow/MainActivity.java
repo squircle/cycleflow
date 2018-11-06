@@ -36,6 +36,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
 
+import ca.cloudsynergy.cycleflow.trafficsim.GpsCoordinates;
+
 /*
  * Main class for CycleFlow Android Application
  *
@@ -399,6 +401,9 @@ public class MainActivity extends AppCompatActivity {
                     approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
                     approachStationRssiTextView.setText(String.valueOf(info.rssi));
                     approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
+                    distanceToIntersectionTextView.setText(String.valueOf(GpsCoordinates.calculateDistance(
+                            new GpsCoordinates(currentLocation.getLatitude(), currentLocation.getLongitude()),
+                            info.coordinates)));
                 }
 
             } else {
