@@ -24,6 +24,11 @@
     <string name="approach_station_rssi">RSSI:</string>
     <string name="approach_station_num_entrances">Entrances:</string>
 
+    <!-- Simulation Options -->
+    <string name="sim_label">Simulation Options:</string>
+    <string name="sim_checkbox">Use simulation data?</string>
+    <string name="sim_ns">North to South</string>
+
 
     <!-- Next activity... -->
 
