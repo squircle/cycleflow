@@ -34,6 +34,28 @@ public class StationInfo {
      */
     public static StationInfo StationInfoBuilder (byte[] aData, int rssi){
         Objects.requireNonNull(aData);
+
+        // Advertising Frame
+        int aFrameLength = (int)aData[0] + 1;
+        byte[] aFrame = Arrays.copyOfRange(aData, 0, aFrameLength);
+
+        // Byte 0: Length of packet
+        // Determine number of entrances based on reported length of packet
+        int numEntrances;
+        if(aData[0] == (byte) 0x1E){ // 30
+            numEntrances = 6;
+        } else if (aData[0] == (byte) 0x1B){ // 27
+            numEntrances = 5;
+        } else if (aData[0] == (byte) 0x18){ // 24
+            numEntrances = 4;
+        } else if (aData[0] == (byte) 0x15){ // 21
+            numEntrances = 3;
+        } else if (aData[0] == (byte) 0x12){ // 18
+            numEntrances = 2;
+        } else { // 15
+            numEntrances = 1;
+        }
+
         // Longitude and Latitude need to be padded to 4 bytes
         byte[] latByte = new byte[4];
         latByte[0] = (byte) 0x00;
@@ -53,32 +75,15 @@ public class StationInfo {
                 ((ByteBuffer.wrap(latByte).getInt() - LATLONG_INT_OFFSET) * LATITUDE_TO_FLOAT_FACTOR)
                         * 100000) / 100000;
 
-        // Determine number of entrances based on reported length of packet
-        int numEntrances;
-        if(aData[0] == (byte) 0x1E){ // 30
-            numEntrances = 6;
-        } else if (aData[0] == (byte) 0x1B){ // 27
-            numEntrances = 5;
-        } else if (aData[0] == (byte) 0x18){ // 24
-            numEntrances = 4;
-        } else if (aData[0] == (byte) 0x15){ // 21
-            numEntrances = 3;
-        } else if (aData[0] == (byte) 0x12){ // 18
-            numEntrances = 2;
-        } else { // 15
-            numEntrances = 1;
-        }
-
+        // Scan Response Frame
         // Convert intersection name from UTF-8
+        byte[] sFrame = Arrays.copyOfRange(aData, aFrameLength, (int)aData[aFrameLength] + aFrameLength + 1);
         String name = "";
         try{
-            // Needs to be updated, shouldn't be +4. +5 Looks the best currently but still has garbage at the end.
-            name = new String(Arrays.copyOfRange(aData, (int)aData[0]+4,aData.length-1), "UTF-8");
+            name = new String(Arrays.copyOfRange(sFrame, 4, sFrame.length), "UTF-8");
         }catch (Exception e){
         }
 
         return new StationInfo(latitude, longitude, name, rssi, numEntrances);
     }
-
-
 }
