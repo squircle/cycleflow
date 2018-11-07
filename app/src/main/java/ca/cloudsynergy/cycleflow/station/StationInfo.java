@@ -72,6 +72,7 @@ public class StationInfo {
         // Convert intersection name from UTF-8
         String name = "";
         try{
+            // Needs to be updated, shouldn't be +4. +5 Looks the best currently but still has garbage at the end.
             name = new String(Arrays.copyOfRange(aData, (int)aData[0]+4,aData.length-1), "UTF-8");
         }catch (Exception e){
         }

@@ -29,6 +29,11 @@
     <string name="sim_checkbox">Use simulation data?</string>
     <string name="sim_ns">North to South</string>
 
+    <!-- Station information -->
+    <string name="station_label">Station information:</string>
+    <string name="station_count">Number of stations:</string>
+    <string name="station_selected">Selected station:</string>
+
 
     <!-- Next activity... -->
 

@@ -34,11 +34,13 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
 import ca.cloudsynergy.cycleflow.station.StationInfo;
+import ca.cloudsynergy.cycleflow.synergy.Synergy;
 
 /*
  * Main class for CycleFlow Android Application
@@ -70,7 +72,6 @@ public class MainActivity extends AppCompatActivity {
     ArrayList<StationInfo> lastScanList = new ArrayList<>(); // List from previous scan
 
     // GPS Location information
-    protected Location currentLocation;
     private String lastUpdateTime;
     private Boolean requestingLocationUpdates;
     private LocationRequest locationRequest;
@@ -78,6 +79,9 @@ public class MainActivity extends AppCompatActivity {
     private FusedLocationProviderClient fusedLocationClient;
     private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
     private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
+
+    // Synergy Module - contains everything needed for calculations. Current Location, current station
+    private Synergy synergy;
 
     // UI Widgets
     private TextView latitudeTextView;
@@ -88,6 +92,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView bearingAccuracyTextView;
     private TextView lastUpdateTimeTextView;
     private TextView distanceToIntersectionTextView;
+    private TextView stationSelectedTextView;
+    private TextView stationCountTextView;
     private TextView approachStationRawDataTextView;
     private TextView approachStationNameTextView;
     private TextView approachStationLatTextView;
@@ -110,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
         requestingLocationUpdates = false; // Wait until permissions have been set.
 
         stations = new HashMap<>();
+        synergy = new Synergy();
 
         createLocationCallback();
         createLocationRequest();
@@ -124,6 +131,8 @@ public class MainActivity extends AppCompatActivity {
         bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_data);
         lastUpdateTimeTextView = findViewById(R.id.last_update_time_data);
         distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_data);
+        stationSelectedTextView = findViewById(R.id.selected_station_data);
+        stationCountTextView = findViewById(R.id.station_count_data);
         approachStationRawDataTextView = findViewById(R.id.approach_station_raw_data);
         approachStationNameTextView = findViewById(R.id.approach_station_name_data);
         approachStationLatTextView = findViewById(R.id.approach_station_lat_data);
@@ -196,7 +205,7 @@ public class MainActivity extends AppCompatActivity {
             public void onLocationResult(LocationResult locationResult) {
                 super.onLocationResult(locationResult);
 
-                currentLocation = locationResult.getLastLocation();
+                synergy.setCurrentLocation(locationResult.getLastLocation());
                 lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
                 updateLocationUi();
             }
@@ -204,13 +213,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateLocationUi() {
+        Location currentLocation = synergy.getCurrentLocation();
         if (currentLocation != null) {
             // TODO: Increase API level for finding accuracy?
-            /*
-            Log.d(TAG, "HAS SPEED?");
-            Log.d(TAG, currentLocation.hasSpeed() + "");
-            Log.d(TAG, "HAS BEARING: " + currentLocation.hasBearing());
-            */
             latitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLatitude()));
             longitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLongitude()));
             currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%f m/s", currentLocation.getSpeed()));
@@ -219,6 +224,9 @@ public class MainActivity extends AppCompatActivity {
             bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26"));
             lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s", lastUpdateTime));
         }
+
+        // Determine which station is being approached with updated information
+        determineStation();
     }
 
     @SuppressLint("MissingPermission")
@@ -246,7 +254,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onComplete(@NonNull Task<Location> task) {
                         if (task.isSuccessful() && task.getResult() != null) {
                             Log.i(TAG, task.getResult().toString());
-                            currentLocation = task.getResult();
+                            synergy.setCurrentLocation(task.getResult());
                             lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
 
                             updateLocationUi();
@@ -367,7 +375,6 @@ public class MainActivity extends AppCompatActivity {
             // Only if the right bytes match should we attempt to create StationInfo
             if (cfData != null && cfData[1] == (byte)0xFF && cfData[2] == (byte)0xFF && cfData[3] == (byte)0xFF && cfData[10] == (byte)0xCF) {
 
-                /*
                 // Generate String version of received data
                 String text = "";
                 for(int i = 0; i < cfData.length; i++){
@@ -377,7 +384,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
                 Log.i("ScanResult", "Scan result data: " + text);
-                */
 
                 // Try to get info from the station
                 StationInfo info = null;
@@ -402,18 +408,12 @@ public class MainActivity extends AppCompatActivity {
                         Log.i("ScanResult","Updated approach station to " + info.name);
                     }
                     // Display data
-                    // approachStationRawDataTextView.setText(text);
+                    approachStationRawDataTextView.setText(text);
                     approachStationNameTextView.setText(info.name);
                     approachStationLatTextView.setText(String.valueOf(info.coordinates.getLatitude()));
                     approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
                     approachStationRssiTextView.setText(String.valueOf(info.rssi));
                     approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
-
-                    if (currentLocation != null) {
-                        distanceToIntersectionTextView.setText(String.valueOf(GpsCoordinates.calculateDistance(
-                                new GpsCoordinates(currentLocation.getLatitude(), currentLocation.getLongitude()),
-                                info.coordinates)));
-                    }
                 }
 
                 // Create station map key based on longitude and latitude
@@ -433,4 +433,38 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    //-------------------------
+    // Station Determination
+
+    private void determineStation() {
+        // TODO: Clear out intersections after they haven't been updated in x time.
+        Iterator<Map.Entry<String, StationInfo>> it = stations.entrySet().iterator();
+//        while(it.hasNext()) {
+//        }
+
+        // Assumptions on size:
+        //      0 - gg no re
+        //      1 - Just display this data
+        //      2 - tbd, most likely if distance < something display other station
+        switch (stations.size()) {
+            case 0:
+                synergy.setCurrentStation(null);
+                break;
+            case 1:
+                synergy.setCurrentStation(stations.entrySet().iterator().next().getValue());
+                break;
+            case 2:
+                break;
+            default:
+                Log.e("determineStation", "Too man stations discovered: "
+                        + stations.size());
+        }
+
+        // Update UI
+        if (synergy.getCurrentStation() != null) {
+            stationCountTextView.setText(String.valueOf(stations.size()));
+            stationSelectedTextView.setText(synergy.getCurrentStation().name);
+            distanceToIntersectionTextView.setText(String.valueOf(synergy.getDistanceToStation()));
+        }
+    }
 }
