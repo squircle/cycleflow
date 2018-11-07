@@ -42,15 +42,15 @@ public class StationInfo {
         // Byte 0: Length of packet
         // Determine number of entrances based on reported length of packet
         int numEntrances;
-        if(aData[0] == (byte) 0x1E){ // 30
+        if(aFrame[0] == (byte) 0x1E){ // 30
             numEntrances = 6;
-        } else if (aData[0] == (byte) 0x1B){ // 27
+        } else if (aFrame[0] == (byte) 0x1B){ // 27
             numEntrances = 5;
-        } else if (aData[0] == (byte) 0x18){ // 24
+        } else if (aFrame[0] == (byte) 0x18){ // 24
             numEntrances = 4;
-        } else if (aData[0] == (byte) 0x15){ // 21
+        } else if (aFrame[0] == (byte) 0x15){ // 21
             numEntrances = 3;
-        } else if (aData[0] == (byte) 0x12){ // 18
+        } else if (aFrame[0] == (byte) 0x12){ // 18
             numEntrances = 2;
         } else { // 15
             numEntrances = 1;
@@ -59,14 +59,14 @@ public class StationInfo {
         // Longitude and Latitude need to be padded to 4 bytes
         byte[] latByte = new byte[4];
         latByte[0] = (byte) 0x00;
-        latByte[1] = aData[4];
-        latByte[2] = aData[5];
-        latByte[3] = aData[6];
+        latByte[1] = aFrame[4];
+        latByte[2] = aFrame[5];
+        latByte[3] = aFrame[6];
         byte[] longByte = new byte[4];
         longByte[0] = (byte) 0x00;
-        longByte[1] = aData[7];
-        longByte[2] = aData[8];
-        longByte[3] = aData[9];
+        longByte[1] = aFrame[7];
+        longByte[2] = aFrame[8];
+        longByte[3] = aFrame[9];
         // Round to 5 decimal places
         double longitude = (double) Math.round(
                 ((ByteBuffer.wrap(longByte).getInt() - LATLONG_INT_OFFSET) * LONGITUDE_TO_FLOAT_FACTOR)
