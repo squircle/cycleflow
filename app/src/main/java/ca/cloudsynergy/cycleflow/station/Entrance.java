@@ -1,10 +1,13 @@
 package ca.cloudsynergy.cycleflow.station;
 
+import ca.cloudsynergy.cycleflow.location.Direction;
+
 public class Entrance {
 
     private LightType type;
     private LightState currentState;
-    private float bearing;
+    private Double bearing;
+    private Direction approxDirection;
     private boolean omnidirectional;
     private int timeToNextLight;
 
@@ -27,10 +30,12 @@ public class Entrance {
         // Approach bearing
         if (nHeading == 0xFF) {
             omnidirectional = true;
-            bearing = -1;
+            bearing = 0.0;
         } else {
             omnidirectional = false;
-            bearing = (int)nHeading * 1.5f;
+            // Transmitted info uses +- 180, app uses 0-360 so add 180
+            bearing = (((int)nHeading * 1.5) + 180);
+            approxDirection = Direction.directionFromBearing(bearing);
         }
 
         // State change time
@@ -39,6 +44,18 @@ public class Entrance {
         }
 
 
+    }
+
+    public Direction getApproxDirection() {
+        return approxDirection;
+    }
+
+    public LightState getCurrentState() {
+        return currentState;
+    }
+
+    public int getTimeToNextLight() {
+        return timeToNextLight;
     }
 
     public enum LightType {

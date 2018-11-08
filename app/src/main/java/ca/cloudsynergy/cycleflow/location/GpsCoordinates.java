@@ -61,4 +61,15 @@ public class GpsCoordinates {
 
         return Math.sqrt(distance);
     }
+
+    // Calculates the approximate direction
+    public static Direction approximateDirection(GpsCoordinates origin, GpsCoordinates destination) {
+        double x = (destination.longitude - origin.longitude) *
+                Math.cos((origin.latitude + destination.latitude)/2);
+        double y = destination.latitude - origin.latitude;
+
+        double bearing = Math.atan(y/x);
+
+        return Direction.directionFromBearing(bearing);
+    }
 }

@@ -4,6 +4,7 @@ import android.location.Location;
 
 import ca.cloudsynergy.cycleflow.location.Direction;
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.station.Entrance;
 import ca.cloudsynergy.cycleflow.station.StationInfo;
 
 public class Synergy {
@@ -14,6 +15,8 @@ public class Synergy {
     private Direction direction;
 
     private StationInfo currentStation;
+    private Entrance desiredEntrance;
+    private GpsCoordinates stationCoordinates;
 
     public double getDistanceToStation() {
         if (currentCoordinates == null || currentStation == null) {
@@ -29,10 +32,12 @@ public class Synergy {
 
     public void setCurrentLocation(Location currentLocation) {
         this.currentLocation = currentLocation;
-        if (currentStation != null) {
-            currentCoordinates = new GpsCoordinates(currentLocation.getLatitude(),
-                    currentLocation.getLongitude());
-        }
+        currentCoordinates = new GpsCoordinates(currentLocation.getLatitude(),
+                currentLocation.getLongitude());
+    }
+
+    public GpsCoordinates getCurrentCoordinates() {
+        return currentCoordinates;
     }
 
     public Long getBearing() {
@@ -57,5 +62,13 @@ public class Synergy {
 
     public void setCurrentStation(StationInfo currentStation) {
         this.currentStation = currentStation;
+    }
+
+    public Entrance getDesiredEntrance() {
+        return desiredEntrance;
+    }
+
+    public void setDesiredEntrance(Entrance desiredEntrance) {
+        this.desiredEntrance = desiredEntrance;
     }
 }

@@ -33,6 +33,9 @@
     <string name="station_label">Station information:</string>
     <string name="station_count">Number of stations:</string>
     <string name="station_selected">Selected station:</string>
+    <string name="station_entrance">Selected entrance:</string>
+    <string name="station_current_light">Current light:</string>
+    <string name="station_time_to_change">Time to change:</string>
 
 
     <!-- Next activity... -->

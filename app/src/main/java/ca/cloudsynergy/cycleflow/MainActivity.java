@@ -38,7 +38,9 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
+import ca.cloudsynergy.cycleflow.location.Direction;
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.station.Entrance;
 import ca.cloudsynergy.cycleflow.station.StationInfo;
 import ca.cloudsynergy.cycleflow.synergy.Synergy;
 
@@ -94,6 +96,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView distanceToIntersectionTextView;
     private TextView stationSelectedTextView;
     private TextView stationCountTextView;
+    private TextView stationSelectedEntranceTextView;
+    private TextView stationCurrentLightTextView;
+    private TextView stationTimeToLightChangeTextView;
     private TextView approachStationRawDataTextView;
     private TextView approachStationNameTextView;
     private TextView approachStationLatTextView;
@@ -133,6 +138,9 @@ public class MainActivity extends AppCompatActivity {
         distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_data);
         stationSelectedTextView = findViewById(R.id.selected_station_data);
         stationCountTextView = findViewById(R.id.station_count_data);
+        stationSelectedEntranceTextView = findViewById(R.id.selected_entrance_data);
+        stationCurrentLightTextView = findViewById(R.id.entrance_light_data);
+        stationTimeToLightChangeTextView = findViewById(R.id.light_time_to_change_data);
         approachStationRawDataTextView = findViewById(R.id.approach_station_raw_data);
         approachStationNameTextView = findViewById(R.id.approach_station_name_data);
         approachStationLatTextView = findViewById(R.id.approach_station_lat_data);
@@ -336,6 +344,7 @@ public class MainActivity extends AppCompatActivity {
     private void scanLeDevice(final boolean enable) {
         if (enable) {
             // stops scanning after 10 seconds
+            /*
             mHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -343,6 +352,7 @@ public class MainActivity extends AppCompatActivity {
                     bluetoothLeScanner.stopScan(mLeScanCallback);
                 }
             }, 20000);
+            */
 
             // Using highest-power mode for scanning
             ScanSettings scanSettings = new ScanSettings.Builder()
@@ -460,11 +470,34 @@ public class MainActivity extends AppCompatActivity {
                         + stations.size());
         }
 
+        // Use the users location relative to the station to determine which entrance they are using
+        if (synergy.getCurrentLocation() != null && synergy.getCurrentStation() != null) {
+            Direction desiredEntrance = GpsCoordinates.approximateDirection(
+                    synergy.getCurrentCoordinates(),
+                    synergy.getCurrentStation().coordinates);
+
+            // TODO: At this time, assuming the intersection will only have one of each direction
+            for (Entrance entrance : synergy.getCurrentStation().entrances) {
+                if (entrance.getApproxDirection() == desiredEntrance) {
+                    synergy.setDesiredEntrance(entrance);
+                }
+            }
+
+            Log.i("desiredEntrance", "Desired entrance: " + desiredEntrance.toString());
+        }
+
         // Update UI
         if (synergy.getCurrentStation() != null) {
             stationCountTextView.setText(String.valueOf(stations.size()));
             stationSelectedTextView.setText(synergy.getCurrentStation().name);
             distanceToIntersectionTextView.setText(String.valueOf(synergy.getDistanceToStation()));
+        }
+
+        if (synergy.getDesiredEntrance() != null) {
+            stationSelectedEntranceTextView.setText(synergy.getDesiredEntrance().getApproxDirection().toString());
+            stationCurrentLightTextView.setText(synergy.getDesiredEntrance().getCurrentState().toString());
+            stationTimeToLightChangeTextView.setText(
+                    String.valueOf(synergy.getDesiredEntrance().getTimeToNextLight()));
         }
     }
 }
