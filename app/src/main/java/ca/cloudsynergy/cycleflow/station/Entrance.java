@@ -33,8 +33,8 @@ public class Entrance {
             bearing = 0.0;
         } else {
             omnidirectional = false;
-            // Transmitted info uses +- 180, app uses 0-360 so add 180
-            bearing = (((int)nHeading * 1.5) + 180);
+            // Convert +- 180 bearing to 0-360
+            bearing = (((int)nHeading * 1.5) + 450) % 360;
             approxDirection = Direction.directionFromBearing(bearing);
         }
 
