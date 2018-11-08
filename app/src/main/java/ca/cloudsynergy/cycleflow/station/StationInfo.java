@@ -1,7 +1,9 @@
 package ca.cloudsynergy.cycleflow.station;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
@@ -13,6 +15,7 @@ public class StationInfo {
     public int rssi;
     public int numEntrances;
     public long time;
+    public List<Entrance> entrances;
 
     // Lat/long conversion factors
     public static final long LATLONG_INT_OFFSET = 8388540;
@@ -22,11 +25,13 @@ public class StationInfo {
     /*
      * Create StationInfo from PARSED ble advertisement data
      */
-    public StationInfo (double latitude, double longitude, String name, int rssi, int numEntrances){
+    public StationInfo (double latitude, double longitude, String name, int rssi,
+                        int numEntrances, List<Entrance> entrances){
         this.coordinates = new GpsCoordinates(latitude, longitude);
-        this.numEntrances = numEntrances;
         this.name = name;
         this.rssi = rssi;
+        this.numEntrances = numEntrances;
+        this.entrances = entrances;
     }
 
     /*
@@ -56,6 +61,10 @@ public class StationInfo {
             numEntrances = 1;
         }
 
+        // Ignoring byte 2-3
+
+        // Latitude  byte 4-6
+        // Longitude byte 7-9
         // Longitude and Latitude need to be padded to 4 bytes
         byte[] latByte = new byte[4];
         latByte[0] = (byte) 0x00;
@@ -75,6 +84,19 @@ public class StationInfo {
                 ((ByteBuffer.wrap(latByte).getInt() - LATLONG_INT_OFFSET) * LATITUDE_TO_FLOAT_FACTOR)
                         * 100000) / 100000;
 
+
+        // Byte 10 contains cycleflow magic number
+
+        // Byte 11-12: Global flags, ignoring for now.
+
+        // Byte 13-end of aFrame, entrance information
+        List<Entrance> entrances = new ArrayList<>();
+        for(int i = 0; i < numEntrances; i++) {
+            int startByte = 13 + i*3;
+            entrances.add(new Entrance(aFrame[startByte], aFrame[startByte + 1], aFrame[startByte + 2]));
+        }
+
+
         // Scan Response Frame
         // Convert intersection name from UTF-8
         byte[] sFrame = Arrays.copyOfRange(aData, aFrameLength, (int)aData[aFrameLength] + aFrameLength + 1);
@@ -84,6 +106,6 @@ public class StationInfo {
         }catch (Exception e){
         }
 
-        return new StationInfo(latitude, longitude, name, rssi, numEntrances);
+        return new StationInfo(latitude, longitude, name, rssi, numEntrances, entrances);
     }
 }
