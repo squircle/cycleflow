@@ -63,13 +63,30 @@ public class GpsCoordinates {
     }
 
     // Calculates the approximate direction
-    public static Direction approximateDirection(GpsCoordinates origin, GpsCoordinates destination) {
-        double x = (destination.longitude - origin.longitude) *
-                Math.cos((origin.latitude + destination.latitude)/2);
-        double y = destination.latitude - origin.latitude;
+    public static double calculateBearing(GpsCoordinates origin, GpsCoordinates destination) {
+        double longitude1 = origin.getLongitude();
+        double longitude2 = destination.getLongitude();
+        double latitude1 = Math.toRadians(origin.getLatitude());
+        double latitude2 = Math.toRadians(destination.getLatitude());
+        double longDiff = Math.toRadians(longitude2 - longitude1);
+        double y = Math.sin(longDiff) * Math.cos(latitude2);
+        double x = Math.cos(latitude1) * Math.sin(latitude2)
+                - Math.sin(latitude1) * Math.cos(latitude2) * Math.cos(longDiff);
 
-        double bearing = Math.atan(y/x);
+        return (Math.toDegrees(Math.atan2(y, x)) + 360) % 360;
+    }
 
-        return Direction.directionFromBearing(bearing);
+    // Calculates the difference between two bearings
+    public static double calculateBearingDiff(double bearing1, double bearing2) {
+        // The max possible difference between two bearings would be 180
+        if (Math.abs(bearing1 - bearing2) > 180) {
+            if (bearing1 > bearing2) {
+                bearing1 += 360;
+            } else {
+                bearing2 += 360;
+            }
+        }
+
+        return Math.abs(bearing1 - bearing2);
     }
 }

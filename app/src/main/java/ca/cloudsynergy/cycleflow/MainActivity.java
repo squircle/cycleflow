@@ -19,6 +19,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,7 +39,6 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
-import ca.cloudsynergy.cycleflow.location.Direction;
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
 import ca.cloudsynergy.cycleflow.station.Entrance;
 import ca.cloudsynergy.cycleflow.station.StationInfo;
@@ -86,6 +86,8 @@ public class MainActivity extends AppCompatActivity {
     private Synergy synergy;
 
     // UI Widgets
+    private CheckBox useSimulationBox;
+
     private TextView latitudeTextView;
     private TextView longitudeTextView;
     private TextView currentSpeedTextView;
@@ -128,6 +130,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void assignWidgets() {
+        useSimulationBox = findViewById(R.id.sim_checkbox);
+
         latitudeTextView = findViewById(R.id.latitude_data);
         longitudeTextView = findViewById(R.id.longitude_data);
         currentSpeedTextView = findViewById(R.id.current_speed_data);
@@ -221,7 +225,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateLocationUi() {
-        Location currentLocation = synergy.getCurrentLocation();
+        Location currentLocation;
+        if (useSimulationBox.isChecked()) {
+            currentLocation = null;
+        } else {
+            currentLocation = synergy.getCurrentLocation();
+        }
+
         if (currentLocation != null) {
             // TODO: Increase API level for finding accuracy?
             latitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLatitude()));
@@ -472,18 +482,29 @@ public class MainActivity extends AppCompatActivity {
 
         // Use the users location relative to the station to determine which entrance they are using
         if (synergy.getCurrentLocation() != null && synergy.getCurrentStation() != null) {
-            Direction desiredEntrance = GpsCoordinates.approximateDirection(
+            Double bearingToIntersection = GpsCoordinates.calculateBearing(
                     synergy.getCurrentCoordinates(),
                     synergy.getCurrentStation().coordinates);
 
-            // TODO: At this time, assuming the intersection will only have one of each direction
+            // Find the entrance with the closest approach angle matching bearing to intersection
+            Entrance closestEntrance = null;
+            double bearingDiff = -1;
             for (Entrance entrance : synergy.getCurrentStation().entrances) {
-                if (entrance.getApproxDirection() == desiredEntrance) {
-                    synergy.setDesiredEntrance(entrance);
+                if (closestEntrance == null) {
+                    closestEntrance = entrance;
+                    bearingDiff = GpsCoordinates.calculateBearingDiff(bearingToIntersection,
+                            entrance.getBearing());
+                } else {
+                    double entranceBearingDiff = GpsCoordinates.calculateBearingDiff(bearingToIntersection,
+                                    entrance.getBearing());
+                    if (entranceBearingDiff < bearingDiff) {
+                        closestEntrance = entrance;
+                        bearingDiff = entranceBearingDiff;
+                    }
                 }
             }
-
-            Log.i("desiredEntrance", "Desired entrance: " + desiredEntrance.toString());
+            synergy.setDesiredEntrance(closestEntrance);
+            Log.i("desiredEntrance", "Desired entrance: " + bearingToIntersection.toString());
         }
 
         // Update UI
@@ -494,7 +515,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (synergy.getDesiredEntrance() != null) {
-            stationSelectedEntranceTextView.setText(synergy.getDesiredEntrance().getApproxDirection().toString());
+            stationSelectedEntranceTextView.setText(synergy.getDesiredEntrance().getBearing().toString());
             stationCurrentLightTextView.setText(synergy.getDesiredEntrance().getCurrentState().toString());
             stationTimeToLightChangeTextView.setText(
                     String.valueOf(synergy.getDesiredEntrance().getTimeToNextLight()));

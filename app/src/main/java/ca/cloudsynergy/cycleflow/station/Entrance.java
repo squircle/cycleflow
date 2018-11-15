@@ -7,7 +7,6 @@ public class Entrance {
     private LightType type;
     private LightState currentState;
     private Double bearing;
-    private Direction approxDirection;
     private boolean omnidirectional;
     private int timeToNextLight;
 
@@ -34,7 +33,6 @@ public class Entrance {
         } else {
             omnidirectional = false;
             bearing = (nHeading & 0xFF) * 1.5;
-            approxDirection = Direction.directionFromBearing(bearing);
         }
 
         // State change time
@@ -45,16 +43,16 @@ public class Entrance {
 
     }
 
-    public Direction getApproxDirection() {
-        return approxDirection;
-    }
-
     public LightState getCurrentState() {
         return currentState;
     }
 
     public int getTimeToNextLight() {
         return timeToNextLight;
+    }
+
+    public Double getBearing() {
+        return bearing;
     }
 
     public enum LightType {
