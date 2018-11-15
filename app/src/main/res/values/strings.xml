@@ -28,6 +28,7 @@
     <string name="sim_label">Simulation Options:</string>
     <string name="sim_checkbox">Use simulation data?</string>
     <string name="sim_ns">North to South</string>
+    <string name="sim_ew">East to West</string>
 
     <!-- Station information -->
     <string name="station_label">Station information:</string>

@@ -20,6 +20,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.CheckBox;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -39,6 +41,7 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
+import ca.cloudsynergy.cycleflow.location.Direction;
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
 import ca.cloudsynergy.cycleflow.simulation.Simulation;
 import ca.cloudsynergy.cycleflow.station.Entrance;
@@ -91,6 +94,9 @@ public class MainActivity extends AppCompatActivity {
 
     // UI Widgets
     private CheckBox useSimulationBox;
+    private RadioGroup simRadioGroup;
+    private RadioButton simNsRadioButton;
+    private RadioButton simEwRadioButton;
 
     private TextView latitudeTextView;
     private TextView longitudeTextView;
@@ -135,6 +141,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void assignWidgets() {
         useSimulationBox = findViewById(R.id.sim_checkbox);
+        simRadioGroup = findViewById(R.id.sim_radio_group);
+        simNsRadioButton = findViewById(R.id.sim_ns);
+        simEwRadioButton = findViewById(R.id.sim_ew);
 
         latitudeTextView = findViewById(R.id.latitude_data);
         longitudeTextView = findViewById(R.id.longitude_data);
@@ -232,7 +241,13 @@ public class MainActivity extends AppCompatActivity {
         Location currentLocation;
         if (useSimulationBox.isChecked()) {
             if (simulation == null) {
-                simulation = new Simulation();
+                Direction direction;
+                if (simRadioGroup.getCheckedRadioButtonId() == simNsRadioButton.getId()) {
+                    direction = Direction.SOUTH;
+                } else {
+                    direction = Direction.WEST;
+                }
+                simulation = new Simulation(direction);
             }
             currentLocation = simulation.getNewLocation();
             synergy.setCurrentLocation(currentLocation);

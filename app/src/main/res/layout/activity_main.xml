@@ -47,7 +47,7 @@
                 app:layout_constraintTop_toBottomOf="@+id/sim_info" />
 
             <RadioGroup
-                android:id="@+id/simRadioGroup"
+                android:id="@+id/sim_radio_group"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
@@ -64,6 +64,15 @@
                     android:layout_weight="1"
                     android:checked="true"
                     android:text="@string/sim_ns" />
+
+                <RadioButton
+                    android:id="@+id/sim_ew"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:checked="false"
+                    android:text="@string/sim_ew" />
+
             </RadioGroup>
 
             <TextView
@@ -75,7 +84,7 @@
                 android:textStyle="bold"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/simRadioGroup" />
+                app:layout_constraintTop_toBottomOf="@+id/sim_radio_group" />
 
             <TextView
                 android:id="@+id/latitude_text"

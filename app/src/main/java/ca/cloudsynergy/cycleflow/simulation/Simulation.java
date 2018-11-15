@@ -1,12 +1,16 @@
 package ca.cloudsynergy.cycleflow.simulation;
 
 import android.location.Location;
+import android.util.Log;
+
+import ca.cloudsynergy.cycleflow.location.Direction;
 
 public class Simulation {
     private int distance; // meters
     private int movement; // how many meters it moves with each update
     private float bearing;
     private long lastUpdateTime;
+    private Direction direction;
     // TODO: Maybe update these so they aren't hard coded.
     // Point of interest (intersection)
     private double latitude = 45.42025;
@@ -15,28 +19,48 @@ public class Simulation {
     // Earth's radius, sphere
     private static final double R = 6378137;
 
-    public Simulation() {
-        distance = 200;
+    public Simulation(Direction direction) {
         movement = 25;
-        bearing = 180F;
+        distance = 200;
+        this.direction = direction;
+
+        switch (direction) {
+            case SOUTH:
+                bearing = 180F;
+                break;
+            case WEST:
+                bearing = 270F;
+                break;
+            default:
+                Log.e("simulation", "Unknown simulation direction");
+        }
+
         lastUpdateTime = System.currentTimeMillis();
     }
 
     public Location getNewLocation() {
         Location location = new Location("simulated location");
-        // Calculate offset in radians
-        double dLat = distance/R;
-        // if ever doing longitude: dLon = de/(R*Cos(Pi*lat/180))
+        location.setLatitude(latitude);
+        location.setLongitude(longitude);
 
-        // offset position, decimal degrees
-        double newLat = latitude + dLat * 180/Math.PI;
-        // newLon = lon + dLon * 180/Pi
+        // Calculate offset in radians
+        switch (direction) {
+            case SOUTH:
+                double dLat = distance/R;
+                // for south to north this would be "-" instead, similar for west to east but below calc instead.
+                double newLat = latitude + dLat * 180/Math.PI;
+                location.setLatitude(newLat);
+                break;
+            case WEST:
+                double dLon = distance / (R*Math.cos(Math.PI * latitude/180));
+                double newLon = longitude + dLon * 180/Math.PI;
+                location.setLongitude(newLon);
+                break;
+        }
+
 
         // Change distance for next update
         updateDistance();
-
-        location.setLatitude(newLat);
-        location.setLongitude(longitude);
 
         long timeTravelled = (System.currentTimeMillis() - lastUpdateTime) / 1000;
         location.setSpeed(((float)movement) / timeTravelled);
