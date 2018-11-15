@@ -2,19 +2,29 @@ package ca.cloudsynergy.cycleflow;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.CheckBox;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import ca.cloudsynergy.cycleflow.trafficsim.GpsCoordinates;
-import ca.cloudsynergy.cycleflow.trafficsim.IntersectionInfo;
-import ca.cloudsynergy.cycleflow.trafficsim.TrafficSim;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -24,22 +34,50 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
-import java.util.Queue;
+import java.util.Map;
 
+import ca.cloudsynergy.cycleflow.location.Direction;
+import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.simulation.Simulation;
+import ca.cloudsynergy.cycleflow.station.Entrance;
+import ca.cloudsynergy.cycleflow.station.StationInfo;
+import ca.cloudsynergy.cycleflow.synergy.Synergy;
+
+/*
+ * Main class for CycleFlow Android Application
+ *
+ * Some code based on DeviceControlActivity.java from Google Samples on Github:
+ * https://github.com/googlesamples/android-BluetoothLeGatt/
+ *
+ * @author Mitchell Kovacs
+ * @author Noah Kruiper
+ */
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = MainActivity.class.getSimpleName();
 
     // Permission Requests
     private final int PR_FINE_LOCATION = 0;
+    private static final int PR_ENABLE_BT = 2;
 
-    // Wireless Information
-    private static Queue<IntersectionInfo> recievedData;
+    // Bluetooth Scanning
+    private BluetoothAdapter mBluetoothAdapter;
+    BluetoothLeScanner bluetoothLeScanner;
+    private boolean mScanning; // currently scanning
+    private Handler mHandler = new Handler(); // handler for scanning
+
+    // Station Info
+    Map<String, StationInfo> stations;
+    StationInfo approachStation; // Selected approach station
+    StationInfo passedStation; // Previously-crossed intersection
+    ArrayList<StationInfo> currentScanList = new ArrayList<>(); // Current list being populated/updated by scanner
+    ArrayList<StationInfo> lastScanList = new ArrayList<>(); // List from previous scan
 
     // GPS Location information
-    protected Location currentLocation;
     private String lastUpdateTime;
     private Boolean requestingLocationUpdates;
     private LocationRequest locationRequest;
@@ -48,17 +86,18 @@ public class MainActivity extends AppCompatActivity {
     private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
     private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
 
-    // Labels
-    private String latitudeLabel;
-    private String longitudeLabel;
-    private String currentSpeedLabel;
-    private String currentSpeedAccuracyLabel;
-    private String bearingLabel;
-    private String bearingAccuracyLabel;
-    private String lastUpdateTimeLabel;
-    private String distanceToInstersectionLabel;
+    // Synergy Module - contains everything needed for calculations. Current Location, current station
+    private Synergy synergy;
+
+    // Simulation module - basic object used to mimic a user moving.
+    private Simulation simulation;
 
     // UI Widgets
+    private CheckBox useSimulationBox;
+    private RadioGroup simRadioGroup;
+    private RadioButton simNsRadioButton;
+    private RadioButton simEwRadioButton;
+
     private TextView latitudeTextView;
     private TextView longitudeTextView;
     private TextView currentSpeedTextView;
@@ -67,8 +106,17 @@ public class MainActivity extends AppCompatActivity {
     private TextView bearingAccuracyTextView;
     private TextView lastUpdateTimeTextView;
     private TextView distanceToIntersectionTextView;
-
-
+    private TextView stationSelectedTextView;
+    private TextView stationCountTextView;
+    private TextView stationSelectedEntranceTextView;
+    private TextView stationCurrentLightTextView;
+    private TextView stationTimeToLightChangeTextView;
+    private TextView approachStationRawDataTextView;
+    private TextView approachStationNameTextView;
+    private TextView approachStationLatTextView;
+    private TextView approachStationLongTextView;
+    private TextView approachStationRssiTextView;
+    private TextView approachStationNumEntrancesTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -77,54 +125,83 @@ public class MainActivity extends AppCompatActivity {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         lastUpdateTime = "";
-        recievedData = new LinkedList<>();
 
-        assignLabels();
+        // Link view elements to objects by label
         assignWidgets();
 
         // TODO: Maybe change this to follow the use of buttons or something.
         requestingLocationUpdates = false; // Wait until permissions have been set.
 
-        TrafficSim.StartSim();
+        stations = new HashMap<>();
+        synergy = new Synergy();
 
         createLocationCallback();
         createLocationRequest();
-
-    }
-
-    private void assignLabels() {
-        latitudeLabel = getResources().getString(R.string.latitude_label);
-        longitudeLabel = getResources().getString(R.string.longitude_label);
-        currentSpeedLabel = getResources().getString(R.string.current_speed_label);
-        currentSpeedAccuracyLabel = getResources().getString(R.string.current_speed_accuracy_label);
-        bearingLabel = getResources().getString(R.string.bearing_label);
-        bearingAccuracyLabel = getResources().getString(R.string.bearing_accuracy_label);
-        lastUpdateTimeLabel = getResources().getString(R.string.last_update_time_label);
-        distanceToInstersectionLabel = getResources().getString(R.string.distance_to_instersection_label);
     }
 
     private void assignWidgets() {
-        latitudeTextView = findViewById(R.id.latitude_text);
-        longitudeTextView = findViewById(R.id.longitude_text);
-        currentSpeedTextView = findViewById(R.id.current_speed_text);
-        currentSpeedAccuracyTextView = findViewById(R.id.current_speed_accuracy_text);
-        bearingTextView = findViewById(R.id.bearing_text);
-        bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_text);
-        lastUpdateTimeTextView = findViewById(R.id.last_update_time_text);
-        distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_text);
+        useSimulationBox = findViewById(R.id.sim_checkbox);
+        simRadioGroup = findViewById(R.id.sim_radio_group);
+        simNsRadioButton = findViewById(R.id.sim_ns);
+        simEwRadioButton = findViewById(R.id.sim_ew);
+
+        latitudeTextView = findViewById(R.id.latitude_data);
+        longitudeTextView = findViewById(R.id.longitude_data);
+        currentSpeedTextView = findViewById(R.id.current_speed_data);
+        currentSpeedAccuracyTextView = findViewById(R.id.current_speed_accuracy_data);
+        bearingTextView = findViewById(R.id.bearing_data);
+        bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_data);
+        lastUpdateTimeTextView = findViewById(R.id.last_update_time_data);
+        distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_data);
+        stationSelectedTextView = findViewById(R.id.selected_station_data);
+        stationCountTextView = findViewById(R.id.station_count_data);
+        stationSelectedEntranceTextView = findViewById(R.id.selected_entrance_data);
+        stationCurrentLightTextView = findViewById(R.id.entrance_light_data);
+        stationTimeToLightChangeTextView = findViewById(R.id.light_time_to_change_data);
+        approachStationRawDataTextView = findViewById(R.id.approach_station_raw_data);
+        approachStationNameTextView = findViewById(R.id.approach_station_name_data);
+        approachStationLatTextView = findViewById(R.id.approach_station_lat_data);
+        approachStationLongTextView = findViewById(R.id.approach_station_long_data);
+        approachStationRssiTextView = findViewById(R.id.approach_station_rssi_data);
+        approachStationNumEntrancesTextView = findViewById(R.id.approach_station_num_entrances_data);
     }
 
     @Override
     public void onStart() {
         super.onStart();
 
-        // Request permissions and get the last known location if permissions are granted.
+        // Handle Bluetooth adapter/scanner
+        mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (mBluetoothAdapter == null) {
+            Toast.makeText(this, "Bluetooth is unavailable", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+        bluetoothLeScanner = mBluetoothAdapter.getBluetoothLeScanner();
+
+        // Request location permissions and get the last known location if permissions are granted.
         if (!checkPermissions()) {
             requestPermissions();
         } else {
             requestingLocationUpdates = true;
             getLastLocation();
         }
+
+        // Request bluetooth to be enabled if it is not already
+        if (!mBluetoothAdapter.isEnabled()) {
+            Log.i(TAG, "Bluetooth not enabled yet");
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableIntent, PR_ENABLE_BT);
+        }
+
+        // Scan for LE Devices
+        scanLeDevice(true);
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
     }
 
     @Override
@@ -133,6 +210,11 @@ public class MainActivity extends AppCompatActivity {
         if (requestingLocationUpdates) {
             startLocationUpdates();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 
     private void createLocationRequest() {
@@ -148,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
             public void onLocationResult(LocationResult locationResult) {
                 super.onLocationResult(locationResult);
 
-                currentLocation = locationResult.getLastLocation();
+                synergy.setCurrentLocation(locationResult.getLastLocation());
                 lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
                 updateLocationUi();
             }
@@ -156,36 +238,37 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateLocationUi() {
+        Location currentLocation;
+        if (useSimulationBox.isChecked()) {
+            if (simulation == null) {
+                Direction direction;
+                if (simRadioGroup.getCheckedRadioButtonId() == simNsRadioButton.getId()) {
+                    direction = Direction.SOUTH;
+                } else {
+                    direction = Direction.WEST;
+                }
+                simulation = new Simulation(direction);
+            }
+            currentLocation = simulation.getNewLocation();
+            synergy.setCurrentLocation(currentLocation);
+            Log.i("simlocation", "Setting the simulated location.");
+        } else {
+            currentLocation = synergy.getCurrentLocation();
+        }
+
         if (currentLocation != null) {
             // TODO: Increase API level for finding accuracy?
-            /*
-            Log.d(TAG, "HAS SPEED?");
-            Log.d(TAG, currentLocation.hasSpeed() + "");
-            Log.d(TAG, "HAS BEARING: " + currentLocation.hasBearing());
-            */
-            latitudeTextView.setText(String.format(Locale.ENGLISH, "%s: %f", latitudeLabel,
-                    currentLocation.getLatitude()));
-            longitudeTextView.setText(String.format(Locale.ENGLISH, "%s: %f", longitudeLabel,
-                    currentLocation.getLongitude()));
-            currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%s: %f m/s", currentSpeedLabel,
-                    currentLocation.getSpeed()));
-            currentSpeedAccuracyTextView.setText(String.format(Locale.ENGLISH, "%s: NEED MIN API OF 26", currentSpeedAccuracyLabel));
-            bearingTextView.setText(String.format(Locale.ENGLISH, "%s: %f degrees", bearingLabel,
-                    currentLocation.getBearing()));
-            bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "%s: NEED MIN API OF 26", bearingAccuracyLabel));
-            lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s: %s", lastUpdateTimeLabel,
-                    lastUpdateTime));
-
-            //TODO Move this next section to be called from somewhere else, like handle the information as you get it instead.
-            while(!recievedData.isEmpty()) {
-                IntersectionInfo intersectionInfo = recievedData.remove();
-                // TODO: At this time only using one intersection, eventually will be mapped to an object or something. Once mapped the bellow needs to be changed to prevent constant overwrites
-                GpsCoordinates location = new GpsCoordinates(currentLocation.getLatitude(), currentLocation.getLongitude());
-                distanceToIntersectionTextView.setText(String.format(Locale.ENGLISH, "%s: %f meters",
-                        distanceToInstersectionLabel,
-                        GpsCoordinates.calculateDistance(location, intersectionInfo.getGpsCoordinates())));
-            }
+            latitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLatitude()));
+            longitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLongitude()));
+            currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%f m/s", currentLocation.getSpeed()));
+            currentSpeedAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26", currentLocation));
+            bearingTextView.setText(String.format(Locale.ENGLISH, "%f degrees", currentLocation.getBearing()));
+            bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26"));
+            lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s", lastUpdateTime));
         }
+
+        // Determine which station is being approached with updated information
+        determineStation();
     }
 
     @SuppressLint("MissingPermission")
@@ -213,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onComplete(@NonNull Task<Location> task) {
                         if (task.isSuccessful() && task.getResult() != null) {
                             Log.i(TAG, task.getResult().toString());
-                            currentLocation = task.getResult();
+                            synergy.setCurrentLocation(task.getResult());
                             lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
 
                             updateLocationUi();
@@ -226,6 +309,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestPermissions() {
+
         boolean shouldProvideRationale =
                 ActivityCompat.shouldShowRequestPermissionRationale(this,
                         Manifest.permission.ACCESS_FINE_LOCATION);
@@ -256,7 +340,7 @@ public class MainActivity extends AppCompatActivity {
         switch (requestCode) {
             case (PR_FINE_LOCATION):
                 if (grantResults.length <= 0) {
-                    // User interaction interuppted, arrays will be empty
+                    // User interaction interrupted, arrays will be empty
                     Log.i(TAG, "User interaction was cancelled.");
                 } else if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     Log.i(TAG, "Permission Granted.");
@@ -269,15 +353,196 @@ public class MainActivity extends AppCompatActivity {
                     // TODO: Handle this.
                 }
                 break;
+            case PR_ENABLE_BT:
+                // When the request to enable Bluetooth returns
+                if (grantResults[0] == Activity.RESULT_OK) {
+                    Toast.makeText(this, "Bluetooth enabled", Toast.LENGTH_SHORT).show();
+                } else {
+                    // User did not enable Bluetooth or an error occurred
+                    Log.d(TAG, "Error enabling Bluetooth");
+                    Toast.makeText(this, "Error enabling Bluetooth", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+                break;
             default:
                 Log.e(TAG, "Unhandled requestCode.");
         }
     }
 
+    //-------------------------
+    // BLE
 
-    // Very basic example method for receiving information. Will be heavily changed/removed
-    // when an actual protocol is used.
-    public static void ReceiveInformation(IntersectionInfo intersectionInfo) {
-        recievedData.add(intersectionInfo);
+    /**
+     * Scan and display available BLE devices.
+     */
+    private void scanLeDevice(final boolean enable) {
+        if (enable) {
+            // stops scanning after 10 seconds
+            /*
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    mScanning = false;
+                    bluetoothLeScanner.stopScan(mLeScanCallback);
+                }
+            }, 20000);
+            */
+
+            // Using highest-power mode for scanning
+            ScanSettings scanSettings = new ScanSettings.Builder()
+                    .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .build();
+            // Not using filters due to many reported bugs in Android
+            // Supposed to filter manually
+            ArrayList<ScanFilter> filters = new ArrayList<ScanFilter>();
+
+            mScanning = true;
+            bluetoothLeScanner.startScan(filters, scanSettings, mLeScanCallback);
+        } else {
+            mScanning = false;
+            bluetoothLeScanner.stopScan(mLeScanCallback);
+        }
+    }
+
+    /**
+     * Callback for BLE scanner
+     */
+    private ScanCallback mLeScanCallback = new ScanCallback() {
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            Log.i("callbackType", String.valueOf(callbackType));
+            Log.i("result", result.toString());
+
+            // Get transmitted bytes from the broadcast data from both packets
+            byte [] cfData = result.getScanRecord().getBytes();
+
+            // Only if the right bytes match should we attempt to create StationInfo
+            if (cfData != null && cfData[1] == (byte)0xFF && cfData[2] == (byte)0xFF && cfData[3] == (byte)0xFF && cfData[10] == (byte)0xCF) {
+
+                // Generate String version of received data
+                String text = "";
+                for(int i = 0; i < cfData.length; i++){
+                    text = text + cfData[i];
+                    if(i == cfData.length/2 - 1){
+                        text = text + "\n";
+                    }
+                }
+                Log.i("ScanResult", "Scan result data: " + text);
+
+                // Try to get info from the station
+                StationInfo info = null;
+                try {
+                    info = StationInfo.StationInfoBuilder(cfData, result.getRssi());
+                    info.time = result.getTimestampNanos();
+                } catch (Exception e){
+                    Log.e("ScanResult", "Error creating Station Info.", e);
+                }
+                // If the info already exists, update it to the latest-received data
+                if(info != null){
+                    for(int i = 0; i < currentScanList.size(); i++){
+                        if(currentScanList.get(i).id == info.id){
+                            currentScanList.remove(i);
+                            currentScanList.add(info);
+                            Log.i("ScanResult","Updated station info for " + info.name + " in the currentScanList");
+                        }
+                    }
+                    // If the candidate is more appropriate, update approach station
+                    if(approachStation != null && approachStation.rssi > info.rssi){
+                        approachStation = info;
+                        Log.i("ScanResult","Updated approach station to " + info.name);
+                    }
+                    // Display data
+                    approachStationRawDataTextView.setText(text);
+                    approachStationNameTextView.setText(info.name);
+                    approachStationLatTextView.setText(String.valueOf(info.coordinates.getLatitude()));
+                    approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
+                    approachStationRssiTextView.setText(String.valueOf(info.rssi));
+                    approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
+                }
+
+                // Create station map key based on longitude and latitude
+                String key = String.valueOf(info.coordinates.getLatitude()) + String.valueOf(info.coordinates.getLongitude());
+                stations.put(key, info);
+
+            } else {
+                Log.i("DATA", "no match");
+            }
+
+            super.onScanResult(callbackType, result);
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            super.onScanFailed(errorCode);
+        }
+    };
+
+    //-------------------------
+    // Station Determination
+
+    private void determineStation() {
+        // TODO: Clear out intersections after they haven't been updated in x time.
+        Iterator<Map.Entry<String, StationInfo>> it = stations.entrySet().iterator();
+//        while(it.hasNext()) {
+//        }
+
+        // Assumptions on size:
+        //      0 - gg no re
+        //      1 - Just display this data
+        //      2 - tbd, most likely if distance < something display other station
+        switch (stations.size()) {
+            case 0:
+                synergy.setCurrentStation(null);
+                break;
+            case 1:
+                synergy.setCurrentStation(stations.entrySet().iterator().next().getValue());
+                break;
+            case 2:
+                break;
+            default:
+                Log.e("determineStation", "Too man stations discovered: "
+                        + stations.size());
+        }
+
+        // Use the users location relative to the station to determine which entrance they are using
+        if (synergy.getCurrentLocation() != null && synergy.getCurrentStation() != null) {
+            Double bearingToIntersection = GpsCoordinates.calculateBearing(
+                    synergy.getCurrentCoordinates(),
+                    synergy.getCurrentStation().coordinates);
+
+            // Find the entrance with the closest approach angle matching bearing to intersection
+            Entrance closestEntrance = null;
+            double bearingDiff = -1;
+            for (Entrance entrance : synergy.getCurrentStation().entrances) {
+                if (closestEntrance == null) {
+                    closestEntrance = entrance;
+                    bearingDiff = GpsCoordinates.calculateBearingDiff(bearingToIntersection,
+                            entrance.getBearing());
+                } else {
+                    double entranceBearingDiff = GpsCoordinates.calculateBearingDiff(bearingToIntersection,
+                                    entrance.getBearing());
+                    if (entranceBearingDiff < bearingDiff) {
+                        closestEntrance = entrance;
+                        bearingDiff = entranceBearingDiff;
+                    }
+                }
+            }
+            synergy.setDesiredEntrance(closestEntrance);
+            Log.i("desiredEntrance", "Desired entrance: " + bearingToIntersection.toString());
+        }
+
+        // Update UI
+        if (synergy.getCurrentStation() != null) {
+            stationCountTextView.setText(String.valueOf(stations.size()));
+            stationSelectedTextView.setText(synergy.getCurrentStation().name);
+            distanceToIntersectionTextView.setText(String.valueOf(synergy.getDistanceToStation()));
+        }
+
+        if (synergy.getDesiredEntrance() != null) {
+            stationSelectedEntranceTextView.setText(synergy.getDesiredEntrance().getBearing().toString());
+            stationCurrentLightTextView.setText(synergy.getDesiredEntrance().getCurrentState().toString());
+            stationTimeToLightChangeTextView.setText(
+                    String.valueOf(synergy.getDesiredEntrance().getTimeToNextLight()));
+        }
     }
 }

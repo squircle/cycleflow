@@ -2,18 +2,44 @@
     <string name="app_name">CycleFlow</string>
 
     <!-- Main Activity -->
-    <string name="latitude_label">Latitude</string>
-    <string name="longitude_label">Longitude</string>
+    <string name="latitude_label">Latitude:</string>
+    <string name="longitude_label">Longitude:</string>
 
-    <string name="current_speed_label">Current Speed</string>
-    <string name="current_speed_accuracy_label">Current Speed Accuracy</string>
+    <string name="current_speed_label">Current Speed:</string>
+    <string name="current_speed_accuracy_label">Current Speed Accuracy:</string>
 
-    <string name="bearing_label">Bearing</string>
-    <string name="bearing_accuracy_label">Bearing Accuracy</string>
+    <string name="bearing_label">Bearing:</string>
+    <string name="bearing_accuracy_label">Bearing Accuracy:</string>
 
-    <string name="last_update_time_label">Last location update time</string>
+    <string name="last_update_time_label">Last location update time:</string>
 
-    <string name="distance_to_instersection_label">Distance to intersection</string>
+    <string name="distance_to_intersection_label">Distance to intersection:</string>
+
+    <string name="title_1_label">Location Information:</string>
+    <string name="title_2_label">Bluetooth Information:</string>
+
+    <string name="approach_station_name">Name:</string>
+    <string name="approach_station_lat">Latitude:</string>
+    <string name="approach_station_long">Longitude:</string>
+    <string name="approach_station_rssi">RSSI:</string>
+    <string name="approach_station_num_entrances">Entrances:</string>
+
+    <!-- Simulation Options -->
+    <string name="sim_label">Simulation Options:</string>
+    <string name="sim_checkbox">Use simulation data?</string>
+    <string name="sim_ns">North to South</string>
+    <string name="sim_ew">East to West</string>
+
+    <!-- Station information -->
+    <string name="station_label">Station information:</string>
+    <string name="station_count">Number of stations:</string>
+    <string name="station_selected">Selected station:</string>
+    <string name="station_entrance">Selected entrance:</string>
+    <string name="station_current_light">Current light:</string>
+    <string name="station_time_to_change">Time to change:</string>
+
 
     <!-- Next activity... -->
+
+
 </resources>
