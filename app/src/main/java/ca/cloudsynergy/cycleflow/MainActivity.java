@@ -40,6 +40,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.simulation.Simulation;
 import ca.cloudsynergy.cycleflow.station.Entrance;
 import ca.cloudsynergy.cycleflow.station.StationInfo;
 import ca.cloudsynergy.cycleflow.synergy.Synergy;
@@ -84,6 +85,9 @@ public class MainActivity extends AppCompatActivity {
 
     // Synergy Module - contains everything needed for calculations. Current Location, current station
     private Synergy synergy;
+
+    // Simulation module - basic object used to mimic a user moving.
+    private Simulation simulation;
 
     // UI Widgets
     private CheckBox useSimulationBox;
@@ -227,7 +231,12 @@ public class MainActivity extends AppCompatActivity {
     private void updateLocationUi() {
         Location currentLocation;
         if (useSimulationBox.isChecked()) {
-            currentLocation = null;
+            if (simulation == null) {
+                simulation = new Simulation();
+            }
+            currentLocation = simulation.getNewLocation();
+            synergy.setCurrentLocation(currentLocation);
+            Log.i("simlocation", "Setting the simulated location.");
         } else {
             currentLocation = synergy.getCurrentLocation();
         }
