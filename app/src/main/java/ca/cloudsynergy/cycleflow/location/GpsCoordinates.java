@@ -1,4 +1,4 @@
-package ca.cloudsynergy.cycleflow.trafficsim;
+package ca.cloudsynergy.cycleflow.location;
 
 /**
  * Created by Mitchell Kovacs on 2018-01-19.
@@ -38,13 +38,12 @@ public class GpsCoordinates {
         this.longitude = longitude;
     }
 
-    // TODO: Verify the accuracy of this calculation.
     // Returns the distance in meters.
     public static double calculateDistance(GpsCoordinates point1, GpsCoordinates point2) {
         double lat1 = point1.getLatitude();
         double lon1 = point1.getLongitude();
         double lat2 = point2.getLatitude();
-        double lon2 = point2.getLatitude();
+        double lon2 = point2.getLongitude();
 
         final int R = 6371; // Radius of the earth
 
@@ -61,5 +60,33 @@ public class GpsCoordinates {
         distance = Math.pow(distance, 2) + Math.pow(height, 2);
 
         return Math.sqrt(distance);
+    }
+
+    // Calculates the approximate direction
+    public static double calculateBearing(GpsCoordinates origin, GpsCoordinates destination) {
+        double longitude1 = origin.getLongitude();
+        double longitude2 = destination.getLongitude();
+        double latitude1 = Math.toRadians(origin.getLatitude());
+        double latitude2 = Math.toRadians(destination.getLatitude());
+        double longDiff = Math.toRadians(longitude2 - longitude1);
+        double y = Math.sin(longDiff) * Math.cos(latitude2);
+        double x = Math.cos(latitude1) * Math.sin(latitude2)
+                - Math.sin(latitude1) * Math.cos(latitude2) * Math.cos(longDiff);
+
+        return (Math.toDegrees(Math.atan2(y, x)) + 360) % 360;
+    }
+
+    // Calculates the difference between two bearings
+    public static double calculateBearingDiff(double bearing1, double bearing2) {
+        // The max possible difference between two bearings would be 180
+        if (Math.abs(bearing1 - bearing2) > 180) {
+            if (bearing1 > bearing2) {
+                bearing1 += 360;
+            } else {
+                bearing2 += 360;
+            }
+        }
+
+        return Math.abs(bearing1 - bearing2);
     }
 }

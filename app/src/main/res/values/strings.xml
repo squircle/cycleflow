@@ -24,6 +24,20 @@
     <string name="approach_station_rssi">RSSI:</string>
     <string name="approach_station_num_entrances">Entrances:</string>
 
+    <!-- Simulation Options -->
+    <string name="sim_label">Simulation Options:</string>
+    <string name="sim_checkbox">Use simulation data?</string>
+    <string name="sim_ns">North to South</string>
+    <string name="sim_ew">East to West</string>
+
+    <!-- Station information -->
+    <string name="station_label">Station information:</string>
+    <string name="station_count">Number of stations:</string>
+    <string name="station_selected">Selected station:</string>
+    <string name="station_entrance">Selected entrance:</string>
+    <string name="station_current_light">Current light:</string>
+    <string name="station_time_to_change">Time to change:</string>
+
 
     <!-- Next activity... -->
 

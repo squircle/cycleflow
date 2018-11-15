@@ -7,7 +7,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
@@ -20,12 +19,12 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.CheckBox;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import ca.cloudsynergy.cycleflow.trafficsim.GpsCoordinates;
-import ca.cloudsynergy.cycleflow.trafficsim.IntersectionInfo;
-import ca.cloudsynergy.cycleflow.trafficsim.TrafficSim;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -37,9 +36,18 @@ import com.google.android.gms.tasks.Task;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
-import java.util.Queue;
+import java.util.Map;
+
+import ca.cloudsynergy.cycleflow.location.Direction;
+import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
+import ca.cloudsynergy.cycleflow.simulation.Simulation;
+import ca.cloudsynergy.cycleflow.station.Entrance;
+import ca.cloudsynergy.cycleflow.station.StationInfo;
+import ca.cloudsynergy.cycleflow.synergy.Synergy;
+
 /*
  * Main class for CycleFlow Android Application
  *
@@ -56,9 +64,6 @@ public class MainActivity extends AppCompatActivity {
     private final int PR_FINE_LOCATION = 0;
     private static final int PR_ENABLE_BT = 2;
 
-    // Wireless Information
-    private static Queue<IntersectionInfo> recievedData;
-
     // Bluetooth Scanning
     private BluetoothAdapter mBluetoothAdapter;
     BluetoothLeScanner bluetoothLeScanner;
@@ -66,13 +71,13 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler = new Handler(); // handler for scanning
 
     // Station Info
+    Map<String, StationInfo> stations;
     StationInfo approachStation; // Selected approach station
     StationInfo passedStation; // Previously-crossed intersection
     ArrayList<StationInfo> currentScanList = new ArrayList<>(); // Current list being populated/updated by scanner
     ArrayList<StationInfo> lastScanList = new ArrayList<>(); // List from previous scan
 
     // GPS Location information
-    protected Location currentLocation;
     private String lastUpdateTime;
     private Boolean requestingLocationUpdates;
     private LocationRequest locationRequest;
@@ -81,7 +86,18 @@ public class MainActivity extends AppCompatActivity {
     private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
     private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
 
+    // Synergy Module - contains everything needed for calculations. Current Location, current station
+    private Synergy synergy;
+
+    // Simulation module - basic object used to mimic a user moving.
+    private Simulation simulation;
+
     // UI Widgets
+    private CheckBox useSimulationBox;
+    private RadioGroup simRadioGroup;
+    private RadioButton simNsRadioButton;
+    private RadioButton simEwRadioButton;
+
     private TextView latitudeTextView;
     private TextView longitudeTextView;
     private TextView currentSpeedTextView;
@@ -90,6 +106,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView bearingAccuracyTextView;
     private TextView lastUpdateTimeTextView;
     private TextView distanceToIntersectionTextView;
+    private TextView stationSelectedTextView;
+    private TextView stationCountTextView;
+    private TextView stationSelectedEntranceTextView;
+    private TextView stationCurrentLightTextView;
+    private TextView stationTimeToLightChangeTextView;
     private TextView approachStationRawDataTextView;
     private TextView approachStationNameTextView;
     private TextView approachStationLatTextView;
@@ -104,7 +125,6 @@ public class MainActivity extends AppCompatActivity {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         lastUpdateTime = "";
-        recievedData = new LinkedList<>();
 
         // Link view elements to objects by label
         assignWidgets();
@@ -112,14 +132,19 @@ public class MainActivity extends AppCompatActivity {
         // TODO: Maybe change this to follow the use of buttons or something.
         requestingLocationUpdates = false; // Wait until permissions have been set.
 
-        TrafficSim.StartSim();
+        stations = new HashMap<>();
+        synergy = new Synergy();
 
         createLocationCallback();
         createLocationRequest();
-
     }
 
     private void assignWidgets() {
+        useSimulationBox = findViewById(R.id.sim_checkbox);
+        simRadioGroup = findViewById(R.id.sim_radio_group);
+        simNsRadioButton = findViewById(R.id.sim_ns);
+        simEwRadioButton = findViewById(R.id.sim_ew);
+
         latitudeTextView = findViewById(R.id.latitude_data);
         longitudeTextView = findViewById(R.id.longitude_data);
         currentSpeedTextView = findViewById(R.id.current_speed_data);
@@ -128,6 +153,11 @@ public class MainActivity extends AppCompatActivity {
         bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_data);
         lastUpdateTimeTextView = findViewById(R.id.last_update_time_data);
         distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_data);
+        stationSelectedTextView = findViewById(R.id.selected_station_data);
+        stationCountTextView = findViewById(R.id.station_count_data);
+        stationSelectedEntranceTextView = findViewById(R.id.selected_entrance_data);
+        stationCurrentLightTextView = findViewById(R.id.entrance_light_data);
+        stationTimeToLightChangeTextView = findViewById(R.id.light_time_to_change_data);
         approachStationRawDataTextView = findViewById(R.id.approach_station_raw_data);
         approachStationNameTextView = findViewById(R.id.approach_station_name_data);
         approachStationLatTextView = findViewById(R.id.approach_station_lat_data);
@@ -200,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
             public void onLocationResult(LocationResult locationResult) {
                 super.onLocationResult(locationResult);
 
-                currentLocation = locationResult.getLastLocation();
+                synergy.setCurrentLocation(locationResult.getLastLocation());
                 lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
                 updateLocationUi();
             }
@@ -208,13 +238,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateLocationUi() {
+        Location currentLocation;
+        if (useSimulationBox.isChecked()) {
+            if (simulation == null) {
+                Direction direction;
+                if (simRadioGroup.getCheckedRadioButtonId() == simNsRadioButton.getId()) {
+                    direction = Direction.SOUTH;
+                } else {
+                    direction = Direction.WEST;
+                }
+                simulation = new Simulation(direction);
+            }
+            currentLocation = simulation.getNewLocation();
+            synergy.setCurrentLocation(currentLocation);
+            Log.i("simlocation", "Setting the simulated location.");
+        } else {
+            currentLocation = synergy.getCurrentLocation();
+        }
+
         if (currentLocation != null) {
             // TODO: Increase API level for finding accuracy?
-            /*
-            Log.d(TAG, "HAS SPEED?");
-            Log.d(TAG, currentLocation.hasSpeed() + "");
-            Log.d(TAG, "HAS BEARING: " + currentLocation.hasBearing());
-            */
             latitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLatitude()));
             longitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLongitude()));
             currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%f m/s", currentLocation.getSpeed()));
@@ -222,16 +265,10 @@ public class MainActivity extends AppCompatActivity {
             bearingTextView.setText(String.format(Locale.ENGLISH, "%f degrees", currentLocation.getBearing()));
             bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26"));
             lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s", lastUpdateTime));
-
-            //TODO Move this next section to be called from somewhere else, like handle the information as you get it instead.
-            while(!recievedData.isEmpty()) {
-                IntersectionInfo intersectionInfo = recievedData.remove();
-                // TODO: At this time only using one intersection, eventually will be mapped to an object or something. Once mapped the bellow needs to be changed to prevent constant overwrites
-                GpsCoordinates location = new GpsCoordinates(currentLocation.getLatitude(), currentLocation.getLongitude());
-                distanceToIntersectionTextView.setText(String.format(Locale.ENGLISH, "%f metres",
-                        GpsCoordinates.calculateDistance(location, intersectionInfo.getGpsCoordinates())));
-            }
         }
+
+        // Determine which station is being approached with updated information
+        determineStation();
     }
 
     @SuppressLint("MissingPermission")
@@ -259,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onComplete(@NonNull Task<Location> task) {
                         if (task.isSuccessful() && task.getResult() != null) {
                             Log.i(TAG, task.getResult().toString());
-                            currentLocation = task.getResult();
+                            synergy.setCurrentLocation(task.getResult());
                             lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
 
                             updateLocationUi();
@@ -332,14 +369,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-    // Very basic example method for receiving information. Will be heavily changed/removed
-    // when an actual protocol is used.
-    public static void ReceiveInformation(IntersectionInfo intersectionInfo) {
-        recievedData.add(intersectionInfo);
-    }
-
-
     //-------------------------
     // BLE
 
@@ -349,6 +378,7 @@ public class MainActivity extends AppCompatActivity {
     private void scanLeDevice(final boolean enable) {
         if (enable) {
             // stops scanning after 10 seconds
+            /*
             mHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -356,6 +386,7 @@ public class MainActivity extends AppCompatActivity {
                     bluetoothLeScanner.stopScan(mLeScanCallback);
                 }
             }, 20000);
+            */
 
             // Using highest-power mode for scanning
             ScanSettings scanSettings = new ScanSettings.Builder()
@@ -382,13 +413,12 @@ public class MainActivity extends AppCompatActivity {
             Log.i("callbackType", String.valueOf(callbackType));
             Log.i("result", result.toString());
 
-            // the broadcast data from both packets
-            ScanRecord record = result.getScanRecord();
+            // Get transmitted bytes from the broadcast data from both packets
+            byte [] cfData = result.getScanRecord().getBytes();
 
-            // Get transmitted bytes
-            byte[] cfData = record.getBytes();
             // Only if the right bytes match should we attempt to create StationInfo
             if (cfData != null && cfData[1] == (byte)0xFF && cfData[2] == (byte)0xFF && cfData[3] == (byte)0xFF && cfData[10] == (byte)0xCF) {
+
                 // Generate String version of received data
                 String text = "";
                 for(int i = 0; i < cfData.length; i++){
@@ -403,6 +433,7 @@ public class MainActivity extends AppCompatActivity {
                 StationInfo info = null;
                 try {
                     info = StationInfo.StationInfoBuilder(cfData, result.getRssi());
+                    info.time = result.getTimestampNanos();
                 } catch (Exception e){
                     Log.e("ScanResult", "Error creating Station Info.", e);
                 }
@@ -429,6 +460,10 @@ public class MainActivity extends AppCompatActivity {
                     approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
                 }
 
+                // Create station map key based on longitude and latitude
+                String key = String.valueOf(info.coordinates.getLatitude()) + String.valueOf(info.coordinates.getLongitude());
+                stations.put(key, info);
+
             } else {
                 Log.i("DATA", "no match");
             }
@@ -442,4 +477,72 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    //-------------------------
+    // Station Determination
+
+    private void determineStation() {
+        // TODO: Clear out intersections after they haven't been updated in x time.
+        Iterator<Map.Entry<String, StationInfo>> it = stations.entrySet().iterator();
+//        while(it.hasNext()) {
+//        }
+
+        // Assumptions on size:
+        //      0 - gg no re
+        //      1 - Just display this data
+        //      2 - tbd, most likely if distance < something display other station
+        switch (stations.size()) {
+            case 0:
+                synergy.setCurrentStation(null);
+                break;
+            case 1:
+                synergy.setCurrentStation(stations.entrySet().iterator().next().getValue());
+                break;
+            case 2:
+                break;
+            default:
+                Log.e("determineStation", "Too man stations discovered: "
+                        + stations.size());
+        }
+
+        // Use the users location relative to the station to determine which entrance they are using
+        if (synergy.getCurrentLocation() != null && synergy.getCurrentStation() != null) {
+            Double bearingToIntersection = GpsCoordinates.calculateBearing(
+                    synergy.getCurrentCoordinates(),
+                    synergy.getCurrentStation().coordinates);
+
+            // Find the entrance with the closest approach angle matching bearing to intersection
+            Entrance closestEntrance = null;
+            double bearingDiff = -1;
+            for (Entrance entrance : synergy.getCurrentStation().entrances) {
+                if (closestEntrance == null) {
+                    closestEntrance = entrance;
+                    bearingDiff = GpsCoordinates.calculateBearingDiff(bearingToIntersection,
+                            entrance.getBearing());
+                } else {
+                    double entranceBearingDiff = GpsCoordinates.calculateBearingDiff(bearingToIntersection,
+                                    entrance.getBearing());
+                    if (entranceBearingDiff < bearingDiff) {
+                        closestEntrance = entrance;
+                        bearingDiff = entranceBearingDiff;
+                    }
+                }
+            }
+            synergy.setDesiredEntrance(closestEntrance);
+            Log.i("desiredEntrance", "Desired entrance: " + bearingToIntersection.toString());
+        }
+
+        // Update UI
+        if (synergy.getCurrentStation() != null) {
+            stationCountTextView.setText(String.valueOf(stations.size()));
+            stationSelectedTextView.setText(synergy.getCurrentStation().name);
+            distanceToIntersectionTextView.setText(String.valueOf(synergy.getDistanceToStation()));
+        }
+
+        if (synergy.getDesiredEntrance() != null) {
+            stationSelectedEntranceTextView.setText(synergy.getDesiredEntrance().getBearing().toString());
+            stationCurrentLightTextView.setText(synergy.getDesiredEntrance().getCurrentState().toString());
+            stationTimeToLightChangeTextView.setText(
+                    String.valueOf(synergy.getDesiredEntrance().getTimeToNextLight()));
+        }
+    }
 }
