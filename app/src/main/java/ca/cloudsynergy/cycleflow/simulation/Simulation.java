@@ -5,6 +5,8 @@ import android.location.Location;
 public class Simulation {
     private int distance; // meters
     private int movement; // how many meters it moves with each update
+    private float bearing;
+    private long lastUpdateTime;
     // TODO: Maybe update these so they aren't hard coded.
     // Point of interest (intersection)
     private double latitude = 45.42025;
@@ -15,7 +17,9 @@ public class Simulation {
 
     public Simulation() {
         distance = 200;
-        movement = 10;
+        movement = 25;
+        bearing = 180F;
+        lastUpdateTime = System.currentTimeMillis();
     }
 
     public Location getNewLocation() {
@@ -26,13 +30,19 @@ public class Simulation {
 
         // offset position, decimal degrees
         double newLat = latitude + dLat * 180/Math.PI;
-        // lonO = lon + dLon * 180/Pi
+        // newLon = lon + dLon * 180/Pi
 
         // Change distance for next update
         updateDistance();
 
         location.setLatitude(newLat);
         location.setLongitude(longitude);
+
+        long timeTravelled = (System.currentTimeMillis() - lastUpdateTime) / 1000;
+        location.setSpeed(((float)movement) / timeTravelled);
+
+        location.setBearing(bearing);
+
         return location;
     }
 
