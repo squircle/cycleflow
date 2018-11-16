@@ -10,7 +10,6 @@ public class Entrance {
     private boolean omnidirectional;
     private int timeToNextLight;
 
-
     public Entrance(byte data, byte nHeading, byte stateChangeTime) {
         // Demand Trigger
         if ((data >> 1 & 1) == 1) {

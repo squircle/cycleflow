@@ -35,11 +35,9 @@ import com.google.android.gms.tasks.Task;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Locale;
-import java.util.Map;
 
 import ca.cloudsynergy.cycleflow.location.Direction;
 import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
@@ -71,11 +69,10 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler = new Handler(); // handler for scanning
 
     // Station Info
-    Map<String, StationInfo> stations;
+    // Map<String, StationInfo> stations; // REPLACED
     StationInfo approachStation; // Selected approach station
     StationInfo passedStation; // Previously-crossed intersection
-    ArrayList<StationInfo> currentScanList = new ArrayList<>(); // Current list being populated/updated by scanner
-    ArrayList<StationInfo> lastScanList = new ArrayList<>(); // List from previous scan
+    ArrayList<StationInfo> stationList; // Current list being populated/updated by scanner
 
     // GPS Location information
     private String lastUpdateTime;
@@ -129,10 +126,10 @@ public class MainActivity extends AppCompatActivity {
         // Link view elements to objects by label
         assignWidgets();
 
-        // TODO: Maybe change this to follow the use of buttons or something.
+        // This is dealt with using onStart(); - should be ok to leave this here
         requestingLocationUpdates = false; // Wait until permissions have been set.
 
-        stations = new HashMap<>();
+        stationList = new ArrayList<>();
         synergy = new Synergy();
 
         createLocationCallback();
@@ -395,7 +392,6 @@ public class MainActivity extends AppCompatActivity {
             // Not using filters due to many reported bugs in Android
             // Supposed to filter manually
             ArrayList<ScanFilter> filters = new ArrayList<ScanFilter>();
-
             mScanning = true;
             bluetoothLeScanner.startScan(filters, scanSettings, mLeScanCallback);
         } else {
@@ -437,13 +433,13 @@ public class MainActivity extends AppCompatActivity {
                 } catch (Exception e){
                     Log.e("ScanResult", "Error creating Station Info.", e);
                 }
-                // If the info already exists, update it to the latest-received data
+                // If the station info exists, update it to the latest-received data
                 if(info != null){
-                    for(int i = 0; i < currentScanList.size(); i++){
-                        if(currentScanList.get(i).id == info.id){
-                            currentScanList.remove(i);
-                            currentScanList.add(info);
-                            Log.i("ScanResult","Updated station info for " + info.name + " in the currentScanList");
+                    for(int i = 0; i < stationList.size(); i++){
+                        if(stationList.get(i).id.equals(info.id)){
+                            stationList.remove(i);
+                            stationList.add(info);
+                            Log.i("ScanResult","Updated station info for " + info.name + " in the stationList");
                         }
                     }
                     // If the candidate is more appropriate, update approach station
@@ -459,10 +455,6 @@ public class MainActivity extends AppCompatActivity {
                     approachStationRssiTextView.setText(String.valueOf(info.rssi));
                     approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
                 }
-
-                // Create station map key based on longitude and latitude
-                String key = String.valueOf(info.coordinates.getLatitude()) + String.valueOf(info.coordinates.getLongitude());
-                stations.put(key, info);
 
             } else {
                 Log.i("DATA", "no match");
@@ -482,29 +474,72 @@ public class MainActivity extends AppCompatActivity {
 
     private void determineStation() {
         // TODO: Clear out intersections after they haven't been updated in x time.
-        Iterator<Map.Entry<String, StationInfo>> it = stations.entrySet().iterator();
-//        while(it.hasNext()) {
-//        }
+        //Iterator<Map.Entry<String, StationInfo>> it = stations.entrySet().iterator();
 
         // Assumptions on size:
-        //      0 - gg no re
-        //      1 - Just display this data
-        //      2 - tbd, most likely if distance < something display other station
-        switch (stations.size()) {
+        //      0 - No stations available
+        //      1 - Select only available station
+        //      n - Use algorithm to select most likely station
+        switch (stationList.size()) {
             case 0:
                 synergy.setCurrentStation(null);
                 break;
             case 1:
-                synergy.setCurrentStation(stations.entrySet().iterator().next().getValue());
-                break;
-            case 2:
+                synergy.setCurrentStation(stationList.get(0));
                 break;
             default:
-                Log.e("determineStation", "Too man stations discovered: "
-                        + stations.size());
+                StationInfo selectedStation = null;
+                // A station is valid if the following conditions are met:
+                //      it is in front of the user
+                //      it has an entrance whose angle is within range of current bearing
+                ArrayList<StationInfo> validStations = new ArrayList<>();
+                // Determine user direction
+                Float userBearing = synergy.getCurrentLocation().getBearing();
+
+                // find all stations within 90 degrees of user bearing
+                for(StationInfo station : stationList){
+                    if(GpsCoordinates.calculateBearingDiff(
+                            userBearing,
+                            GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates))
+                            < 90){
+                        validStations.add(station);
+                    }
+                }
+                // eliminate stations without an entrance with a valid angle
+                // criteria: the difference between entrance bearing or user/user-station must be <=80
+                for(StationInfo station : validStations){
+                    boolean valid = false;
+                    for(Entrance entrance : station.entrances){
+                        double entrance_user = GpsCoordinates.calculateBearingDiff(
+                                synergy.getCurrentLocation().getBearing(),entrance.getBearing());
+                        double entrance_user_station = GpsCoordinates.calculateBearingDiff(
+                                GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates), entrance.getBearing());
+                        if((entrance_user <= 80) || (entrance_user_station <= 80)){
+                            valid = true;
+                            break;
+                        }
+                    }
+                    if(!valid){
+                        validStations.remove(station);
+                    }
+                }
+
+                // select the closest station
+                double distance = 0;
+                for(StationInfo station : validStations){
+                    if(selectedStation == null){
+                        selectedStation = station;
+                        distance = GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), selectedStation.coordinates);
+                    } else if (GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), station.coordinates) < distance){
+                        selectedStation = station;
+                    }
+                }
+
+                synergy.setCurrentStation(selectedStation);
+                break;
         }
 
-        // Use the users location relative to the station to determine which entrance they are using
+        // Use the user's location relative to the station to determine which entrance they are using
         if (synergy.getCurrentLocation() != null && synergy.getCurrentStation() != null) {
             Double bearingToIntersection = GpsCoordinates.calculateBearing(
                     synergy.getCurrentCoordinates(),
@@ -533,13 +568,13 @@ public class MainActivity extends AppCompatActivity {
 
         // Update UI
         if (synergy.getCurrentStation() != null) {
-            stationCountTextView.setText(String.valueOf(stations.size()));
+            stationCountTextView.setText(String.valueOf(stationList.size()));
             stationSelectedTextView.setText(synergy.getCurrentStation().name);
             distanceToIntersectionTextView.setText(String.valueOf(synergy.getDistanceToStation()));
         }
 
         if (synergy.getDesiredEntrance() != null) {
-            stationSelectedEntranceTextView.setText(synergy.getDesiredEntrance().getBearing().toString());
+            stationSelectedEntranceTextView.setText(String.valueOf(synergy.getDesiredEntrance().getBearing()));
             stationCurrentLightTextView.setText(synergy.getDesiredEntrance().getCurrentState().toString());
             stationTimeToLightChangeTextView.setText(
                     String.valueOf(synergy.getDesiredEntrance().getTimeToNextLight()));

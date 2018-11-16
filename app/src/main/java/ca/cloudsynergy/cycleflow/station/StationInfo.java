@@ -26,12 +26,14 @@ public class StationInfo {
      * Create StationInfo from PARSED ble advertisement data
      */
     public StationInfo (double latitude, double longitude, String name, int rssi,
-                        int numEntrances, List<Entrance> entrances){
+                        int numEntrances, List<Entrance> entrances, long time){
         this.coordinates = new GpsCoordinates(latitude, longitude);
         this.name = name;
         this.rssi = rssi;
         this.numEntrances = numEntrances;
         this.entrances = entrances;
+        this.time = time;
+        this.id = String.valueOf(latitude) + String.valueOf(longitude);
     }
 
     /*
@@ -63,14 +65,14 @@ public class StationInfo {
 
         // Ignoring byte 2-3
 
-        // Latitude  byte 4-6
-        // Longitude byte 7-9
         // Longitude and Latitude need to be padded to 4 bytes
+        // Latitude  byte 4-6
         byte[] latByte = new byte[4];
         latByte[0] = (byte) 0x00;
         latByte[1] = aFrame[4];
         latByte[2] = aFrame[5];
         latByte[3] = aFrame[6];
+        // Longitude byte 7-9
         byte[] longByte = new byte[4];
         longByte[0] = (byte) 0x00;
         longByte[1] = aFrame[7];
@@ -84,8 +86,7 @@ public class StationInfo {
                 ((ByteBuffer.wrap(latByte).getInt() - LATLONG_INT_OFFSET) * LATITUDE_TO_FLOAT_FACTOR)
                         * 100000) / 100000;
 
-
-        // Byte 10 contains cycleflow magic number
+        // Byte 10 contains CycleFlow magic number
 
         // Byte 11-12: Global flags, ignoring for now.
 
@@ -96,7 +97,6 @@ public class StationInfo {
             entrances.add(new Entrance(aFrame[startByte], aFrame[startByte + 1], aFrame[startByte + 2]));
         }
 
-
         // Scan Response Frame
         // Convert intersection name from UTF-8
         byte[] sFrame = Arrays.copyOfRange(aData, aFrameLength, (int)aData[aFrameLength] + aFrameLength + 1);
@@ -106,6 +106,6 @@ public class StationInfo {
         }catch (Exception e){
         }
 
-        return new StationInfo(latitude, longitude, name, rssi, numEntrances, entrances);
+        return new StationInfo(latitude, longitude, name, rssi, numEntrances, entrances, System.currentTimeMillis());
     }
 }

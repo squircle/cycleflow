@@ -9,14 +9,21 @@ import ca.cloudsynergy.cycleflow.station.StationInfo;
 
 public class Synergy {
 
+    // State information
+    public enum state{
+        NO_STATION,
+
+    }
+
+    // User data
     private Location currentLocation;
     private GpsCoordinates currentCoordinates;
     private Long bearing;
     private Direction direction;
 
+    // Station data
     private StationInfo currentStation;
     private Entrance desiredEntrance;
-    private GpsCoordinates stationCoordinates;
 
     public double getDistanceToStation() {
         if (currentCoordinates == null || currentStation == null) {
@@ -24,7 +31,6 @@ public class Synergy {
         }
         return GpsCoordinates.calculateDistance(currentCoordinates, currentStation.coordinates);
     }
-
 
     public Location getCurrentLocation() {
         return currentLocation;

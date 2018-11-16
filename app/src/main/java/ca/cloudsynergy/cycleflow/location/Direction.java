@@ -30,7 +30,7 @@ public enum Direction {
     }
 
     // Just keeping it simple for now with only 4 directions.
-    public static Direction directionFromBearing(Double bearing) {
+    public static Direction directionFromBearing(float bearing) {
         if ((bearing > 315 && bearing <= 380) || (bearing >= 0 && bearing <= 45)) {
             return NORTH;
         } else if (bearing > 45 && bearing <= 135) {
