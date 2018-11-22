@@ -20,8 +20,8 @@ public class Simulation {
     private static final double R = 6378137;
 
     public Simulation(Direction direction) {
-        movement = 25;
-        distance = 200;
+        movement = 30;
+        distance = 300;
         this.direction = direction;
 
         switch (direction) {

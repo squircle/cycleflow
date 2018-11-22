@@ -37,6 +37,7 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 import ca.cloudsynergy.cycleflow.location.Direction;
@@ -69,9 +70,6 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler = new Handler(); // handler for scanning
 
     // Station Info
-    // Map<String, StationInfo> stations; // REPLACED
-    StationInfo approachStation; // Selected approach station
-    StationInfo passedStation; // Previously-crossed intersection
     ArrayList<StationInfo> stationList; // Current list being populated/updated by scanner
 
     // GPS Location information
@@ -131,6 +129,15 @@ public class MainActivity extends AppCompatActivity {
 
         stationList = new ArrayList<>();
         synergy = new Synergy();
+
+        // Create testing station
+        ArrayList<Entrance> list = new ArrayList<>();
+        Entrance e1 = new Entrance((byte)0,(byte)(180/1.5),(byte)30);
+        list.add(e1);
+        StationInfo testStation = new StationInfo(45.421267, -75.685106, "Test Station", -50, 1, list, System.currentTimeMillis());
+
+        stationList.add(testStation);
+
 
         createLocationCallback();
         createLocationRequest();
@@ -435,25 +442,28 @@ public class MainActivity extends AppCompatActivity {
                 }
                 // If the station info exists, update it to the latest-received data
                 if(info != null){
+                    boolean found = false;
                     for(int i = 0; i < stationList.size(); i++){
                         if(stationList.get(i).id.equals(info.id)){
+                            found = true;
                             stationList.remove(i);
                             stationList.add(info);
                             Log.i("ScanResult","Updated station info for " + info.name + " in the stationList");
                         }
                     }
-                    // If the candidate is more appropriate, update approach station
-                    if(approachStation != null && approachStation.rssi > info.rssi){
-                        approachStation = info;
-                        Log.i("ScanResult","Updated approach station to " + info.name);
+
+                    if(!found){
+                        stationList.add(info);
                     }
+
                     // Display data
-                    approachStationRawDataTextView.setText(text);
-                    approachStationNameTextView.setText(info.name);
-                    approachStationLatTextView.setText(String.valueOf(info.coordinates.getLatitude()));
-                    approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
-                    approachStationRssiTextView.setText(String.valueOf(info.rssi));
-                    approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
+                    // TODO UPDATE
+//                    approachStationRawDataTextView.setText(text);
+//                    approachStationNameTextView.setText(info.name);
+//                    approachStationLatTextView.setText(String.valueOf(info.coordinates.getLatitude()));
+//                    approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
+//                    approachStationRssiTextView.setText(String.valueOf(info.rssi));
+//                    approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
                 }
 
             } else {
@@ -480,14 +490,14 @@ public class MainActivity extends AppCompatActivity {
         //      0 - No stations available
         //      1 - Select only available station
         //      n - Use algorithm to select most likely station
-        switch (stationList.size()) {
-            case 0:
-                synergy.setCurrentStation(null);
-                break;
-            case 1:
-                synergy.setCurrentStation(stationList.get(0));
-                break;
-            default:
+//        switch (stationList.size()) {
+//            case 0:
+//                synergy.setCurrentStation(null);
+//                break;
+//            case 1:
+//                synergy.setCurrentStation(stationList.get(0));
+//                break;
+//            default:
                 StationInfo selectedStation = null;
                 // A station is valid if the following conditions are met:
                 //      it is in front of the user
@@ -498,15 +508,16 @@ public class MainActivity extends AppCompatActivity {
 
                 // find all stations within 90 degrees of user bearing
                 for(StationInfo station : stationList){
-                    if(GpsCoordinates.calculateBearingDiff(
+                    double bDif = GpsCoordinates.calculateBearingDiff(
                             userBearing,
-                            GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates))
-                            < 90){
+                            GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates));
+                    if(bDif < 90){
                         validStations.add(station);
                     }
                 }
                 // eliminate stations without an entrance with a valid angle
                 // criteria: the difference between entrance bearing or user/user-station must be <=80
+                ArrayList<StationInfo> nextValid = new ArrayList<>();
                 for(StationInfo station : validStations){
                     boolean valid = false;
                     for(Entrance entrance : station.entrances){
@@ -515,18 +526,15 @@ public class MainActivity extends AppCompatActivity {
                         double entrance_user_station = GpsCoordinates.calculateBearingDiff(
                                 GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates), entrance.getBearing());
                         if((entrance_user <= 80) || (entrance_user_station <= 80)){
-                            valid = true;
+                            nextValid.add(station);
                             break;
                         }
-                    }
-                    if(!valid){
-                        validStations.remove(station);
                     }
                 }
 
                 // select the closest station
                 double distance = 0;
-                for(StationInfo station : validStations){
+                for(StationInfo station : nextValid){
                     if(selectedStation == null){
                         selectedStation = station;
                         distance = GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), selectedStation.coordinates);
@@ -536,8 +544,8 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 synergy.setCurrentStation(selectedStation);
-                break;
-        }
+//                break;
+//        }
 
         // Use the user's location relative to the station to determine which entrance they are using
         if (synergy.getCurrentLocation() != null && synergy.getCurrentStation() != null) {
