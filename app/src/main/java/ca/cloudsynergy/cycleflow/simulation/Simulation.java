@@ -21,7 +21,7 @@ public class Simulation {
 
     public Simulation(Direction direction) {
         movement = 30;
-        distance = 300;
+        distance = 250;
         this.direction = direction;
 
         switch (direction) {

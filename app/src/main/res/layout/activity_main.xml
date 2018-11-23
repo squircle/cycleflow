@@ -7,9 +7,34 @@
     android:minHeight="0dp"
     tools:context="ca.cloudsynergy.cycleflow.MainActivity">
 
+
+    <TextView
+        android:id="@+id/light_status"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/symbol_light"
+        android:text="-"
+        android:textAlignment="center"
+        android:textColor="#f8fdf9"
+        android:textSize="132sp"
+        app:layout_constraintDimensionRatio="H,1:1"
+        app:layout_constraintEnd_toStartOf="@+id/guideline"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/station_name" />
+
+
     <ScrollView
+        android:id="@+id/scrollView2"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        app:layout_constraintTop_toBottomOf="@+id/light_status">
 
         <android.support.constraint.ConstraintLayout
             android:layout_width="match_parent"
@@ -22,18 +47,6 @@
                 android:orientation="vertical"
                 app:layout_constraintGuide_percent="0.5" />
 
-            <TextView
-                android:id="@+id/sim_info"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/sim_label"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintHorizontal_bias="0.501"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
             <CheckBox
                 android:id="@+id/sim_checkbox"
                 android:layout_width="wrap_content"
@@ -41,11 +54,11 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="10dp"
-                android:checked="true"
+                android:checked="false"
                 android:text="@string/sim_checkbox"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/sim_info" />
+                app:layout_constraintTop_toBottomOf="@+id/map" />
 
             <RadioGroup
                 android:id="@+id/sim_radio_group"
@@ -77,25 +90,14 @@
             </RadioGroup>
 
             <TextView
-                android:id="@+id/title1"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/title_1_label"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/sim_radio_group" />
-
-            <TextView
                 android:id="@+id/latitude_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/latitude_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@id/title1" />
+                app:layout_constraintEnd_toStartOf="@+id/sim_radio_group"
+                app:layout_constraintTop_toBottomOf="@+id/sim_radio_group" />
 
             <TextView
                 android:id="@+id/latitude_data"
@@ -104,8 +106,8 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@id/title1" />
+                app:layout_constraintStart_toEndOf="@+id/latitude_text"
+                app:layout_constraintTop_toBottomOf="@id/sim_radio_group" />
 
             <TextView
                 android:id="@+id/longitude_text"
@@ -113,8 +115,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/longitude_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/latitude_text" />
+                app:layout_constraintEnd_toEndOf="@+id/sim_checkbox"
+                app:layout_constraintTop_toBottomOf="@+id/sim_radio_group" />
 
             <TextView
                 android:id="@+id/longitude_data"
@@ -123,16 +125,17 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/latitude_text" />
+                app:layout_constraintStart_toEndOf="@+id/longitude_text"
+                app:layout_constraintTop_toBottomOf="@+id/sim_radio_group" />
 
             <TextView
                 android:id="@+id/current_speed_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/current_speed_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/longitude_text" />
 
             <TextView
@@ -142,36 +145,18 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toEndOf="@+id/current_speed_text"
                 app:layout_constraintTop_toBottomOf="@+id/longitude_text" />
-
-            <TextView
-                android:id="@+id/current_speed_accuracy_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/current_speed_accuracy_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/current_speed_text" />
-
-            <TextView
-                android:id="@+id/current_speed_accuracy_data"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="8dp"
-                android:text="-"
-                app:layout_constraintStart_toEndOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/current_speed_text" />
 
             <TextView
                 android:id="@+id/bearing_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/bearing_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/current_speed_accuracy_text" />
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintTop_toBottomOf="@+id/longitude_text" />
 
             <TextView
                 android:id="@+id/bearing_data"
@@ -180,27 +165,8 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/current_speed_accuracy_text" />
-
-            <TextView
-                android:id="@+id/bearing_accuracy_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/bearing_accuracy_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/bearing_text" />
-
-            <TextView
-                android:id="@+id/bearing_accuracy_data"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_marginTop="8dp"
-                android:text="-"
-                app:layout_constraintStart_toEndOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/bearing_text" />
+                app:layout_constraintStart_toEndOf="@+id/bearing_text"
+                app:layout_constraintTop_toBottomOf="@+id/longitude_data" />
 
             <TextView
                 android:id="@+id/last_update_time_text"
@@ -208,8 +174,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/last_update_time_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/bearing_accuracy_text" />
+                app:layout_constraintTop_toBottomOf="@+id/current_speed_text" />
 
             <TextView
                 android:id="@+id/last_update_time_data"
@@ -218,19 +183,8 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/bearing_accuracy_text" />
-
-            <TextView
-                android:id="@+id/station_info"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/station_label"
-                android:textStyle="bold"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/last_update_time_text" />
+                app:layout_constraintStart_toEndOf="@+id/last_update_time_text"
+                app:layout_constraintTop_toBottomOf="@+id/bearing_text" />
 
             <TextView
                 android:id="@+id/station_count_text"
@@ -240,7 +194,7 @@
                 android:layout_marginEnd="8dp"
                 android:text="@string/station_count"
                 app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/station_info" />
+                app:layout_constraintTop_toBottomOf="@+id/last_update_time_text" />
 
             <TextView
                 android:id="@+id/station_count_data"
@@ -250,7 +204,7 @@
                 android:layout_marginTop="8dp"
                 android:text="-"
                 app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
-                app:layout_constraintTop_toBottomOf="@+id/station_info" />
+                app:layout_constraintTop_toBottomOf="@+id/last_update_time_text" />
 
             <TextView
                 android:id="@+id/distance_to_intersection_data"
@@ -267,7 +221,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="8dp"
                 android:text="@string/distance_to_intersection_label"
                 app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
                 app:layout_constraintTop_toBottomOf="@+id/selected_station_text" />
@@ -462,23 +416,107 @@
                 android:id="@+id/selected_station_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
                 android:text="@string/station_selected"
-                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
                 app:layout_constraintTop_toBottomOf="@+id/station_count_text" />
 
             <TextView
                 android:id="@+id/selected_station_data"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@+id/selected_station_text"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
                 app:layout_constraintTop_toBottomOf="@+id/station_count_text" />
+
+
+            <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:tools="http://schemas.android.com/tools"
+                android:id="@+id/map"
+                android:name="com.google.android.gms.maps.SupportMapFragment"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.0"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                tools:context=".MapsActivity" />
+
 
         </android.support.constraint.ConstraintLayout>
     </ScrollView>
+
+    <android.support.constraint.Guideline
+        android:id="@+id/guideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.6" />
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:adjustViewBounds="true"
+        app:layout_constraintBottom_toTopOf="@+id/scrollView2"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/guideline"
+        app:srcCompat="@drawable/cyclist_icon_text" />
+
+    <TextView
+        android:id="@+id/speed_advice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="-"
+        android:textColor="@android:color/white"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/imageView"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toBottomOf="@+id/station_name" />
+
+    <TextView
+        android:id="@+id/user_speed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="48dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="24dp"
+        android:text="-"
+        android:textColor="@android:color/white"
+        android:textSize="38sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@+id/light_status"
+        app:layout_constraintEnd_toEndOf="@+id/imageView"
+        app:layout_constraintStart_toStartOf="@+id/imageView"
+        app:layout_constraintTop_toTopOf="@+id/imageView" />
+
+    <TextView
+        android:id="@+id/station_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:text="-"
+        android:textSize="36sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+
+
 
 </android.support.constraint.ConstraintLayout>
