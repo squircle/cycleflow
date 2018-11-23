@@ -54,6 +54,25 @@ public class Entrance {
         return bearing;
     }
 
+
+    public void updateLightTimer(){
+        if(timeToNextLight > 0){
+            timeToNextLight--;
+        }
+    }
+
+    public void flipLightTimer(int time){
+        timeToNextLight = time;
+        switch (currentState){
+            case GREEN:
+                currentState = LightState.RED;
+                break;
+            case RED:
+                currentState = LightState.GREEN;
+                break;
+        }
+    }
+
     public enum LightType {
         TIME,
         DEMAND

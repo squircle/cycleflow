@@ -108,4 +108,15 @@ public class StationInfo {
 
         return new StationInfo(latitude, longitude, name, rssi, numEntrances, entrances, System.currentTimeMillis());
     }
+
+    public void updateTimers(){
+        for(Entrance entrance : entrances){
+            entrance.updateLightTimer();
+        }
+    }
+    public void flipTimers(int time){
+        for(Entrance entrance : entrances){
+            entrance.flipLightTimer(time);
+        }
+    }
 }

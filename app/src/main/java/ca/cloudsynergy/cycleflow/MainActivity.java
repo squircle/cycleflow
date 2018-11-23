@@ -11,14 +11,19 @@ import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.location.Location;
+import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.res.ResourcesCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
 import android.widget.CheckBox;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -30,14 +35,22 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptor;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 import ca.cloudsynergy.cycleflow.location.Direction;
@@ -56,7 +69,7 @@ import ca.cloudsynergy.cycleflow.synergy.Synergy;
  * @author Mitchell Kovacs
  * @author Noah Kruiper
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
     private static final String TAG = MainActivity.class.getSimpleName();
 
     // Permission Requests
@@ -71,6 +84,12 @@ public class MainActivity extends AppCompatActivity {
 
     // Station Info
     ArrayList<StationInfo> stationList; // Current list being populated/updated by scanner
+
+    // Update UI, perform checks
+    private CountDownTimer updater;
+
+    // Map
+    private GoogleMap mMap;
 
     // GPS Location information
     private String lastUpdateTime;
@@ -96,9 +115,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView latitudeTextView;
     private TextView longitudeTextView;
     private TextView currentSpeedTextView;
-    private TextView currentSpeedAccuracyTextView;
     private TextView bearingTextView;
-    private TextView bearingAccuracyTextView;
     private TextView lastUpdateTimeTextView;
     private TextView distanceToIntersectionTextView;
     private TextView stationSelectedTextView;
@@ -106,12 +123,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView stationSelectedEntranceTextView;
     private TextView stationCurrentLightTextView;
     private TextView stationTimeToLightChangeTextView;
-    private TextView approachStationRawDataTextView;
-    private TextView approachStationNameTextView;
-    private TextView approachStationLatTextView;
-    private TextView approachStationLongTextView;
-    private TextView approachStationRssiTextView;
-    private TextView approachStationNumEntrancesTextView;
+
+    private TextView lightStatus;
+    private TextView stationName;
+    private TextView userSpeed;
+    private TextView speedAdvice;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +136,12 @@ public class MainActivity extends AppCompatActivity {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         lastUpdateTime = "";
+
+        // Make the map
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+                .findFragmentById(R.id.map);
+        mapFragment.getMapAsync(this);
+
 
         // Link view elements to objects by label
         assignWidgets();
@@ -138,7 +160,6 @@ public class MainActivity extends AppCompatActivity {
 
         stationList.add(testStation);
 
-
         createLocationCallback();
         createLocationRequest();
     }
@@ -148,13 +169,10 @@ public class MainActivity extends AppCompatActivity {
         simRadioGroup = findViewById(R.id.sim_radio_group);
         simNsRadioButton = findViewById(R.id.sim_ns);
         simEwRadioButton = findViewById(R.id.sim_ew);
-
         latitudeTextView = findViewById(R.id.latitude_data);
         longitudeTextView = findViewById(R.id.longitude_data);
         currentSpeedTextView = findViewById(R.id.current_speed_data);
-        currentSpeedAccuracyTextView = findViewById(R.id.current_speed_accuracy_data);
         bearingTextView = findViewById(R.id.bearing_data);
-        bearingAccuracyTextView = findViewById(R.id.bearing_accuracy_data);
         lastUpdateTimeTextView = findViewById(R.id.last_update_time_data);
         distanceToIntersectionTextView = findViewById(R.id.distance_to_intersection_data);
         stationSelectedTextView = findViewById(R.id.selected_station_data);
@@ -162,12 +180,11 @@ public class MainActivity extends AppCompatActivity {
         stationSelectedEntranceTextView = findViewById(R.id.selected_entrance_data);
         stationCurrentLightTextView = findViewById(R.id.entrance_light_data);
         stationTimeToLightChangeTextView = findViewById(R.id.light_time_to_change_data);
-        approachStationRawDataTextView = findViewById(R.id.approach_station_raw_data);
-        approachStationNameTextView = findViewById(R.id.approach_station_name_data);
-        approachStationLatTextView = findViewById(R.id.approach_station_lat_data);
-        approachStationLongTextView = findViewById(R.id.approach_station_long_data);
-        approachStationRssiTextView = findViewById(R.id.approach_station_rssi_data);
-        approachStationNumEntrancesTextView = findViewById(R.id.approach_station_num_entrances_data);
+
+        userSpeed = findViewById(R.id.user_speed);
+        stationName = findViewById(R.id.station_name);
+        lightStatus = findViewById(R.id.light_status);
+        speedAdvice = findViewById(R.id.speed_advice);
     }
 
     @Override
@@ -201,6 +218,23 @@ public class MainActivity extends AppCompatActivity {
         // Scan for LE Devices
         scanLeDevice(true);
 
+        // Begin UI update process
+        updater = new CountDownTimer(1000, 20) {
+
+            @Override
+            public void onTick(long millisUntilFinished) {
+                // Do nothing every tick
+            }
+
+            @Override
+            public void onFinish() {
+                try{
+                    update();
+                }catch(Exception e){
+                    Log.e("Error", "Error: " + e.toString());
+                }
+            }
+        }.start();
     }
 
     @Override
@@ -221,6 +255,32 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
+    private void update(){
+        // Update time of test station so it doesn't expire, and flip light timer if needed
+        for(StationInfo station : stationList){
+            if(station.name.equals("Test Station")){
+                station.time = System.currentTimeMillis()-2000;
+                if(station.entrances.get(0).getTimeToNextLight() == 0){
+                    station.flipTimers(30);
+                }
+            }
+        }
+
+        // Update station timers if they were last seen more than 1 second ago
+        for(StationInfo station : stationList){
+            if(station.time < System.currentTimeMillis()-1000){
+                station.updateTimers();
+            }
+        }
+
+        determineStation();
+
+
+
+        // Restart timer
+        updater.start();
+    }
+
     private void createLocationRequest() {
         locationRequest = new LocationRequest();
         locationRequest.setInterval(UPDATE_INTERVAL_IN_MILLISECONDS);
@@ -233,7 +293,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onLocationResult(LocationResult locationResult) {
                 super.onLocationResult(locationResult);
-
                 synergy.setCurrentLocation(locationResult.getLastLocation());
                 lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
                 updateLocationUi();
@@ -265,9 +324,7 @@ public class MainActivity extends AppCompatActivity {
             latitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLatitude()));
             longitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLongitude()));
             currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%f m/s", currentLocation.getSpeed()));
-            currentSpeedAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26", currentLocation));
             bearingTextView.setText(String.format(Locale.ENGLISH, "%f degrees", currentLocation.getBearing()));
-            bearingAccuracyTextView.setText(String.format(Locale.ENGLISH, "NEED MIN API OF 26"));
             lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s", lastUpdateTime));
         }
 
@@ -302,7 +359,6 @@ public class MainActivity extends AppCompatActivity {
                             Log.i(TAG, task.getResult().toString());
                             synergy.setCurrentLocation(task.getResult());
                             lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-
                             updateLocationUi();
                         } else {
                             Log.w(TAG, "getLastLocation:exception", task.getException());
@@ -483,69 +539,65 @@ public class MainActivity extends AppCompatActivity {
     // Station Determination
 
     private void determineStation() {
-        // TODO: Clear out intersections after they haven't been updated in x time.
-        //Iterator<Map.Entry<String, StationInfo>> it = stations.entrySet().iterator();
+        // A station is valid if the following conditions are met:
+        //      it has been heard from in the last 15 seconds
+        //      it is in front of the user
+        //      it has an entrance whose angle is within range of current bearing
 
-        // Assumptions on size:
-        //      0 - No stations available
-        //      1 - Select only available station
-        //      n - Use algorithm to select most likely station
-//        switch (stationList.size()) {
-//            case 0:
-//                synergy.setCurrentStation(null);
-//                break;
-//            case 1:
-//                synergy.setCurrentStation(stationList.get(0));
-//                break;
-//            default:
-                StationInfo selectedStation = null;
-                // A station is valid if the following conditions are met:
-                //      it is in front of the user
-                //      it has an entrance whose angle is within range of current bearing
-                ArrayList<StationInfo> validStations = new ArrayList<>();
-                // Determine user direction
-                Float userBearing = synergy.getCurrentLocation().getBearing();
+        // Removing old stations
+        ArrayList<StationInfo> oldStations = new ArrayList<>();
+        for(StationInfo station : stationList){
+            if(station.time < System.currentTimeMillis()-15000){
+                oldStations.add(station);
+            }
+        }
+        for(StationInfo station : oldStations){
+            stationList.remove(station);
+        }
 
-                // find all stations within 90 degrees of user bearing
-                for(StationInfo station : stationList){
-                    double bDif = GpsCoordinates.calculateBearingDiff(
-                            userBearing,
-                            GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates));
-                    if(bDif < 90){
-                        validStations.add(station);
-                    }
+        StationInfo selectedStation = null;
+
+        // find all stations within 90 degrees of user bearing
+        ArrayList<StationInfo> validStations = new ArrayList<>();
+        // Determine user direction
+        Float userBearing = synergy.getCurrentLocation().getBearing();
+        for(StationInfo station : stationList){
+            double bDif = GpsCoordinates.calculateBearingDiff(
+                    userBearing,
+                    GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates));
+            if(bDif < 90){
+                validStations.add(station);
+            }
+        }
+
+        // eliminate stations without an entrance with a valid angle
+        // criteria: the difference between entrance bearing or user/user-station must be <=80
+        ArrayList<StationInfo> nextValid = new ArrayList<>();
+        for(StationInfo station : validStations){
+            for(Entrance entrance : station.entrances){
+                double entrance_user = GpsCoordinates.calculateBearingDiff(
+                        synergy.getCurrentLocation().getBearing(),entrance.getBearing());
+                double entrance_user_station = GpsCoordinates.calculateBearingDiff(
+                        GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates), entrance.getBearing());
+                if((entrance_user <= 80) || (entrance_user_station <= 80)){
+                    nextValid.add(station);
+                    break;
                 }
-                // eliminate stations without an entrance with a valid angle
-                // criteria: the difference between entrance bearing or user/user-station must be <=80
-                ArrayList<StationInfo> nextValid = new ArrayList<>();
-                for(StationInfo station : validStations){
-                    boolean valid = false;
-                    for(Entrance entrance : station.entrances){
-                        double entrance_user = GpsCoordinates.calculateBearingDiff(
-                                synergy.getCurrentLocation().getBearing(),entrance.getBearing());
-                        double entrance_user_station = GpsCoordinates.calculateBearingDiff(
-                                GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates), entrance.getBearing());
-                        if((entrance_user <= 80) || (entrance_user_station <= 80)){
-                            nextValid.add(station);
-                            break;
-                        }
-                    }
-                }
+            }
+        }
 
-                // select the closest station
-                double distance = 0;
-                for(StationInfo station : nextValid){
-                    if(selectedStation == null){
-                        selectedStation = station;
-                        distance = GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), selectedStation.coordinates);
-                    } else if (GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), station.coordinates) < distance){
-                        selectedStation = station;
-                    }
-                }
+        // select the closest station
+        double distance = 0;
+        for(StationInfo station : nextValid){
+            if(selectedStation == null){
+                selectedStation = station;
+                distance = GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), selectedStation.coordinates);
+            } else if (GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), station.coordinates) < distance){
+                selectedStation = station;
+            }
+        }
 
-                synergy.setCurrentStation(selectedStation);
-//                break;
-//        }
+        synergy.setCurrentStation(selectedStation);
 
         // Use the user's location relative to the station to determine which entrance they are using
         if (synergy.getCurrentLocation() != null && synergy.getCurrentStation() != null) {
@@ -579,13 +631,71 @@ public class MainActivity extends AppCompatActivity {
             stationCountTextView.setText(String.valueOf(stationList.size()));
             stationSelectedTextView.setText(synergy.getCurrentStation().name);
             distanceToIntersectionTextView.setText(String.valueOf(synergy.getDistanceToStation()));
-        }
 
-        if (synergy.getDesiredEntrance() != null) {
             stationSelectedEntranceTextView.setText(String.valueOf(synergy.getDesiredEntrance().getBearing()));
             stationCurrentLightTextView.setText(synergy.getDesiredEntrance().getCurrentState().toString());
-            stationTimeToLightChangeTextView.setText(
-                    String.valueOf(synergy.getDesiredEntrance().getTimeToNextLight()));
+            stationTimeToLightChangeTextView.setText(String.valueOf(synergy.getDesiredEntrance().getTimeToNextLight()));
+
+            // Set end-user GUI elements
+
+            if(synergy.getDesiredEntrance().getCurrentState() == Entrance.LightState.GREEN){
+                GradientDrawable drawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.symbol_light, null);
+                drawable.setColor(Color.parseColor("#03ae3c")); // green
+                lightStatus.setBackground(drawable);
+            } else {
+                GradientDrawable drawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.symbol_light, null);
+                drawable.setColor(Color.parseColor("#d50000")); // red
+                lightStatus.setBackground(drawable);
+            }
+            lightStatus.setText(String.format(Locale.ENGLISH, "%d", synergy.getDesiredEntrance().getTimeToNextLight()));
+            stationName.setText(synergy.getCurrentStation().name);
+
+            // Determine if the user is going fast enough
+            if(synergy.getDistanceToStation() > synergy.getDesiredEntrance().getTimeToNextLight()*synergy.getCurrentLocation().getSpeed()){
+                speedAdvice.setText("Speed up!");
+            } else {
+                speedAdvice.setText("Speed OK");
+            }
+
+        } else {
+            GradientDrawable drawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.symbol_light, null);
+            drawable.setColor(Color.parseColor("#616161")); // gray
+            lightStatus.setBackground(drawable);
+            lightStatus.setText("-");
+            stationName.setText("-");
+            speedAdvice.setText("-");
         }
+        int speed = (int)(synergy.getCurrentLocation().getSpeed()*3.6);
+        if(speed > 0 && speed < 100){
+            userSpeed.setText(String.valueOf(speed));
+        }else {
+            userSpeed.setText("0");
+        }
+        lightStatus.setGravity(Gravity.CENTER);
+
+        // Clear and add user marker
+        mMap.clear();
+        LatLng user = new LatLng(synergy.getCurrentCoordinates().getLatitude(), synergy.getCurrentCoordinates().getLongitude());
+        mMap.addMarker(new MarkerOptions().position(user).title("User").icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_bike_bordered_small)));
+
+        if(synergy.getCurrentStation() != null){
+            // Add a marker for the station
+            LatLng sta = new LatLng(synergy.getCurrentStation().coordinates.getLatitude(), synergy.getCurrentStation().coordinates.getLongitude());
+            mMap.addMarker(new MarkerOptions().position(sta).title(synergy.getCurrentStation().name).icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_isometric_light_small)));
+        }
+
+        // Move map to user location
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(user));
+        mMap.moveCamera(CameraUpdateFactory.zoomTo((float)16.5));
+
     }
+
+    // When the map is ready, display a certain area
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+    }
+
+
+
 }
