@@ -68,3 +68,6 @@ dkms.conf
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# nRF52 toolchain
+_build/
