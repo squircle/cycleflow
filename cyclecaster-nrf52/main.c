@@ -33,6 +33,8 @@
 #define NUM_ADV_BUFFERS         2 /**< Number of advertising buffers used */
 #define APP_BLE_MAX_PAYLOAD     27 /**< Maximum payload, net of GAP headers */
 
+#define BLE_TX_POWER            +4 /**< Transmit power of nRF52 in dBm: -40, -20, -16, -12, -8, -4, 0 (default), +3, +4 */
+
 #define CF_MAGIC_NUMBER         0xCF    /**< Magic number to identify CycleFlow advertisements */
 
 #define USE_HARDCODED_NAME      1       /**< Whether to use hardcoded name or get it from SD config */
@@ -245,9 +247,8 @@ static uint8_t build_scan_rsp_info(uint8_t dest[], IntersectionData * i_data)
     return count;
 }
 
-/**@brief Function for starting advertising.
+/**@brief Function for starting advertising and setting Tx power level
  */
-//TODO: collapse this into main() since we need to start/stop when new data (maybe?)
 static void advertising_start(void)
 {
     ret_code_t err_code;
@@ -256,6 +257,10 @@ static void advertising_start(void)
     APP_ERROR_CHECK(err_code);
 
     err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+    APP_ERROR_CHECK(err_code);
+
+    // Set transmit power
+    err_code = sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, m_adv_handle, BLE_TX_POWER);
     APP_ERROR_CHECK(err_code);
 }
 
