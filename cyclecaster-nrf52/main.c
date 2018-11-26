@@ -30,17 +30,20 @@
 #define ADVERTISING_INTERVAL    MSEC_TO_UNITS(100, UNIT_0_625_MS)   /**< Advertising interval for non-connectable advertisment (min 100ms) */
 #define APP_COMPANY_IDENTIFIER  0xFFFF  /**< Bluetooth GAP company identifiers (0xFFFF reserved for testing) */
 #define DEAD_BEEF               0xDEADBEEF  /**< Error code for debugging stack dumps. */
-#define NUM_ADV_BUFFERS         2 /**< Number of advertising buffers used */
-#define APP_BLE_MAX_PAYLOAD     27 /**< Maximum payload, net of GAP headers */
+#define NUM_ADV_BUFFERS         2       /**< Number of advertising buffers used */
+#define APP_BLE_MAX_PAYLOAD     27      /**< Maximum payload, net of GAP headers */
 
-#define BLE_TX_POWER            +4 /**< Transmit power of nRF52 in dBm: -40, -20, -16, -12, -8, -4, 0 (default), +3, +4 */
+#define BLE_TX_POWER            +4      /**< Transmit power of nRF52 in dBm: -40, -20, -16, -12, -8, -4, 0 (default), +3, +4 */
 
 #define CF_MAGIC_NUMBER         0xCF    /**< Magic number to identify CycleFlow advertisements */
 
 #define USE_HARDCODED_NAME      1       /**< Whether to use hardcoded name or get it from SD config */
 #define HARDCODED_NAME          "ABCDEFGHIJKLMNOPQRSTUVWXYZZ" // Max length 27 chars
 
-#define USE_TEST_STRUCT         1       /**< Whether to use a hardcoded test structure */
+// Configuration type -- only one of the following should be set
+#define STATIC_DEMO             1       /**< Hardcoded test structure static demo */
+#define INTERNAL_TIMER_DEMO     0       /**< Flag for demoing using internal timer */
+#define UART_DEMO               0       /**< Not yet implemented */
 
 /* ========================= Definitions/Declarations ========================= */
 
@@ -54,10 +57,15 @@ static uint8_t              enc_sr_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; 
 
 static uint8_t              raw_adv_data_buffer1[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< First raw advertising data buffer */
 static uint8_t              raw_sr_data_buffer1[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< First raw scan response data buffer */
-// static uint8_t              raw_adv_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second raw advertising data buffer */
-// static uint8_t              raw_sr_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second raw scan response data buffer */
+#if !STATIC_DEMO
+static uint8_t              raw_adv_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second raw advertising data buffer */
+static uint8_t              raw_sr_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second raw scan response data buffer */
+#endif // !STATIC_DEMO
 
 static uint8_t              currentBuffer = 0; /**< Buffer ID currently in use (from 0 to NUM_ADV_BUFFERS) */
+#if !STATIC_DEMO
+static uint8_t              nextBuffer = 1; /**< Next buffer to be used (from 0 to NUM_ADV_BUFFERS) */
+#endif // !STATIC_DEMO
 static bool                 advertising_init = false; /**< Tracks whether BLE has been initialized */
 
 /**
@@ -104,7 +112,7 @@ typedef struct IntersectionData
     char    name[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Friendly name of intersection */
 } IntersectionData;
 
-#ifdef USE_TEST_STRUCT
+#if STATIC_DEMO
 static IntersectionData intersection_data = 
 {
     .latitude = {0xC0, 0x98, 0x9C},
@@ -138,13 +146,13 @@ static IntersectionData intersection_data =
         }
     },
     
-#ifdef USE_HARDCODED_NAME
+#if USE_HARDCODED_NAME
     .name = HARDCODED_NAME
 #else // ! USE_HARDCODED_NAME
     .name = "UNINITIALIZED"
 #endif // USE_HARDCODED_NAME
 };
-#endif // USE_TEST_STRUCT
+#endif // STATIC_DEMO
 
 /* ========================= Functions ========================= */
 
@@ -415,18 +423,18 @@ int main(void)
     ble_stack_init();
     // TODO: initialize UART
 
-#ifdef USE_TEST_STRUCT
+#if STATIC_DEMO
     // If the test structure is used, the information is static (i.e. no double-buffer
-    // or timer incrementing happens). TODO: fix this for static demos
+    // or timer incrementing happens).
     uint16_t adv_payload_len, sr_payload_len;
     adv_payload_len = build_beacon_info(raw_adv_data_buffer1, &intersection_data);
     sr_payload_len = build_scan_rsp_info(raw_sr_data_buffer1, &intersection_data);
     advertising_setup(raw_adv_data_buffer1, &adv_payload_len,
                         raw_sr_data_buffer1, &sr_payload_len,
                         &m_gap_adv_buffers[currentBuffer]);
-#else // ! USE_TEST_STRUCT
-    //TODO: add functionality for dynamic updating
-#endif // USE_TEST_STRUCT
+#elif INTERNAL_TIMER_DEMO
+    
+#endif
 
     // Start execution.
     NRF_LOG_INFO("Beacon started.");
