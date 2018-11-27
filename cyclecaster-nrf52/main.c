@@ -32,35 +32,37 @@
 #define DEAD_BEEF               0xDEADBEEF  /**< Error code for debugging stack dumps. */
 #define NUM_ADV_BUFFERS         2       /**< Number of advertising buffers used */
 #define APP_BLE_MAX_PAYLOAD     27      /**< Maximum payload, net of GAP headers */
-
 #define BLE_TX_POWER            +4      /**< Transmit power of nRF52 in dBm: -40, -20, -16, -12, -8, -4, 0 (default), +3, +4 */
+
+#define DEBUG                   1   //FIXME: remove after debugging
 
 #define CF_MAGIC_NUMBER         0xCF    /**< Magic number to identify CycleFlow advertisements */
 
 #define USE_HARDCODED_NAME      1       /**< Whether to use hardcoded name or get it from SD config */
 #define HARDCODED_NAME          "ABCDEFGHIJKLMNOPQRSTUVWXYZZ" // Max length 27 chars
 
+#define TIMER_FREQUENCY_MS      1000    /**< Timer period for internal demos (ms) */
+
 // Configuration type -- only one of the following should be set
-#define STATIC_DEMO             1       /**< Hardcoded test structure static demo */
-#define INTERNAL_TIMER_DEMO     0       /**< Flag for demoing using internal timer */
+#define STATIC_DEMO             0       /**< Hardcoded test structure static demo */
+#define INTERNAL_TIMER_DEMO     1       /**< Flag for demoing using internal timer */
 #define UART_DEMO               0       /**< Not yet implemented */
 
-/* ========================= Definitions/Declarations ========================= */
+#define DEMO_ENTRANCES          4       /**< Number of entrances in the demo structure */
+
+/* ========================= Declarations ========================= */
 
 static ble_gap_adv_params_t m_adv_params;   /**< Advertising parameters (passed to sd_ble_gap_adv_set_configure) */
 static uint8_t              m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;  /**< Handle to advertising instance ID */
 
-static uint8_t              enc_adv_data_buffer1[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< First encoded advertising data buffer */
-static uint8_t              enc_sr_data_buffer1[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< First encoded scan response data buffer */
-static uint8_t              enc_adv_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second encoded advertising data buffer */
-static uint8_t              enc_sr_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second encoded scan response data buffer */
+static uint16_t             adv_payload_len;    /**< Payload length of encoded advertising frame (from build_beacon_info) */
+static uint16_t             sr_payload_len;     /**< Payload length of encoded scan response frame (from build_scan_rsp_info) */
 
-static uint8_t              raw_adv_data_buffer1[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< First raw advertising data buffer */
-static uint8_t              raw_sr_data_buffer1[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< First raw scan response data buffer */
-#if !STATIC_DEMO
-static uint8_t              raw_adv_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second raw advertising data buffer */
-static uint8_t              raw_sr_data_buffer2[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Second raw scan response data buffer */
-#endif // !STATIC_DEMO
+static uint8_t              enc_adv_data_buffer[NUM_ADV_BUFFERS][BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Encoded advertising data buffer */
+static uint8_t              enc_sr_data_buffer[NUM_ADV_BUFFERS][BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Encoded scan response data buffer */
+
+static uint8_t              raw_adv_data_buffer[NUM_ADV_BUFFERS][BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Raw advertising data buffer */
+static uint8_t              raw_sr_data_buffer[NUM_ADV_BUFFERS][BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Raw scan response data buffer */
 
 static uint8_t              currentBuffer = 0; /**< Buffer ID currently in use (from 0 to NUM_ADV_BUFFERS) */
 #if !STATIC_DEMO
@@ -68,22 +70,30 @@ static uint8_t              nextBuffer = 1; /**< Next buffer to be used (from 0 
 #endif // !STATIC_DEMO
 static bool                 advertising_init = false; /**< Tracks whether BLE has been initialized */
 
+#if INTERNAL_TIMER_DEMO
+// Timer-specific data structures
+APP_TIMER_DEF(demo_timer_id);           /**< Allocating the timer ID in memory */
+#define TIMER_DEMO_CYCLE_TIME   25      /**< Internal timer demo light cycle time */
+#endif
+
+/* ========================= Type Definitions ========================= */
+
 /**
  * @brief Array to hold advertising data buffer info
  */
 static ble_gap_adv_data_t  m_gap_adv_buffers[NUM_ADV_BUFFERS] = 
 {
     {
-        .adv_data.p_data        = enc_adv_data_buffer1,
-        .adv_data.len           = sizeof(enc_adv_data_buffer1),
-        .scan_rsp_data.p_data   = enc_sr_data_buffer1,
-        .scan_rsp_data.len      = sizeof(enc_sr_data_buffer1)
+        .adv_data.p_data        = enc_adv_data_buffer[0],
+        .adv_data.len           = sizeof(enc_adv_data_buffer[0]),
+        .scan_rsp_data.p_data   = enc_sr_data_buffer[0],
+        .scan_rsp_data.len      = sizeof(enc_sr_data_buffer[0])
     },
     {
-        .adv_data.p_data        = enc_adv_data_buffer2,
-        .adv_data.len           = sizeof(enc_adv_data_buffer2),
-        .scan_rsp_data.p_data   = enc_sr_data_buffer2,
-        .scan_rsp_data.len      = sizeof(enc_sr_data_buffer2)
+        .adv_data.p_data        = enc_adv_data_buffer[1],
+        .adv_data.len           = sizeof(enc_adv_data_buffer[1]),
+        .scan_rsp_data.p_data   = enc_sr_data_buffer[1],
+        .scan_rsp_data.len      = sizeof(enc_sr_data_buffer[1])
     }
 };
 
@@ -112,7 +122,7 @@ typedef struct IntersectionData
     char    name[BLE_GAP_ADV_SET_DATA_SIZE_MAX]; /**< Friendly name of intersection */
 } IntersectionData;
 
-#if STATIC_DEMO
+#if STATIC_DEMO || INTERNAL_TIMER_DEMO
 static IntersectionData intersection_data = 
 {
     .latitude = {0xC0, 0x98, 0x9C},
@@ -410,6 +420,81 @@ static void advertising_setup(uint8_t * adv_frame_payload, uint16_t * adv_frame_
     }
 }
 
+// TODO: create documentation blocks once function prototype defined
+#if INTERNAL_TIMER_DEMO
+static void decrement_and_flip_zero(IntersectionData* i_data)
+{
+    // decrement all counters in intersection_data
+    // if reached 0, flip all status bits 
+
+    int i;
+    uint8_t newTime;
+    bool doFlipStatusBit;
+
+    if (i_data->entrances[0].changeTime == 0)
+    {
+        doFlipStatusBit = true;
+        newTime = TIMER_DEMO_CYCLE_TIME;
+    }
+    else
+    {
+        doFlipStatusBit = false;
+        newTime = i_data->entrances[0].changeTime - 1;
+    }
+
+    for (i = 0; i < DEMO_ENTRANCES; i++) 
+    {
+        i_data->entrances[i].changeTime = newTime;
+
+        if (doFlipStatusBit)
+        {
+            i_data->entrances[i].isGreen = !i_data->entrances[i].isGreen;
+        }
+    }
+}
+
+static void demo_timer_timeout_handler()
+{
+    // change timing data
+    decrement_and_flip_zero(&intersection_data);
+
+    adv_payload_len = build_beacon_info(raw_adv_data_buffer[nextBuffer], &intersection_data);
+    sr_payload_len = build_scan_rsp_info(raw_sr_data_buffer[nextBuffer], &intersection_data);
+
+    advertising_setup(raw_adv_data_buffer[nextBuffer], &adv_payload_len,
+                        raw_sr_data_buffer[nextBuffer], &sr_payload_len,
+                        &m_gap_adv_buffers[nextBuffer]);
+
+    nextBuffer = (nextBuffer + 1) % NUM_ADV_BUFFERS;
+    currentBuffer = (currentBuffer + 1) % NUM_ADV_BUFFERS;
+}
+
+static void demo_timer_setup(void)
+{
+    uint32_t err_code;
+
+    err_code = app_timer_create(&demo_timer_id, APP_TIMER_MODE_REPEATED, demo_timer_timeout_handler);
+    APP_ERROR_CHECK(err_code);
+}
+
+static void demo_timer_start()
+{
+    uint32_t err_code;
+    uint32_t timeout_ticks = APP_TIMER_TICKS(TIMER_FREQUENCY_MS);
+
+    err_code = app_timer_start(demo_timer_id, timeout_ticks, NULL);
+    APP_ERROR_CHECK(err_code);
+}
+
+// static void demo_timer_stop()
+// {
+//     uint32_t err_code;
+
+//     err_code = app_timer_stop(demo_timer_id);
+//     APP_ERROR_CHECK(err_code);
+// }
+#endif
+
 /**
  * @brief Function for application main entry.
  */
@@ -426,14 +511,16 @@ int main(void)
 #if STATIC_DEMO
     // If the test structure is used, the information is static (i.e. no double-buffer
     // or timer incrementing happens).
-    uint16_t adv_payload_len, sr_payload_len;
-    adv_payload_len = build_beacon_info(raw_adv_data_buffer1, &intersection_data);
-    sr_payload_len = build_scan_rsp_info(raw_sr_data_buffer1, &intersection_data);
-    advertising_setup(raw_adv_data_buffer1, &adv_payload_len,
-                        raw_sr_data_buffer1, &sr_payload_len,
+    adv_payload_len = build_beacon_info(raw_adv_data_buffer[0], &intersection_data);
+    sr_payload_len = build_scan_rsp_info(raw_sr_data_buffer[0], &intersection_data);
+    advertising_setup(raw_adv_data_buffer[0], &adv_payload_len,
+                        raw_sr_data_buffer[0], &sr_payload_len,
                         &m_gap_adv_buffers[currentBuffer]);
 #elif INTERNAL_TIMER_DEMO
-    
+    // set up and start timer
+    demo_timer_timeout_handler(); // prepare data structures for advertising once to avoid crash
+    demo_timer_setup();
+    demo_timer_start();
 #endif
 
     // Start execution.
