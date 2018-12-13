@@ -1,10 +1,15 @@
 package ca.cloudsynergy.cycleflow.location;
 
+/**
+ * Store and manipulate direction data.
+ *
+ * @author Mitchell Kovacs
+ */
 public enum Direction {
-    NORTH ("North"),
-    EAST ("East"),
-    SOUTH ("South"),
-    WEST ("West");
+    NORTH("North"),
+    EAST("East"),
+    SOUTH("South"),
+    WEST("West");
 
     private Direction opposite;
     private String name;
@@ -16,12 +21,12 @@ public enum Direction {
         WEST.opposite = EAST;
     }
 
-    Direction (String name) {
+    Direction(String name) {
         this.name = name;
     }
 
     public Direction getOppositeDirection() {
-        return  opposite;
+        return opposite;
     }
 
     @Override

@@ -7,10 +7,15 @@ import ca.cloudsynergy.cycleflow.location.GpsCoordinates;
 import ca.cloudsynergy.cycleflow.station.Entrance;
 import ca.cloudsynergy.cycleflow.station.StationInfo;
 
+/**
+ * Link core information and provide state information.
+ *
+ * @author Mitchell Kovacs
+ */
 public class Synergy {
 
     // State information
-    public enum state{
+    public enum state {
         NO_STATION,
 
     }

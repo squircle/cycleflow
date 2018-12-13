@@ -1,9 +1,10 @@
 package ca.cloudsynergy.cycleflow.location;
 
 /**
- * Created by Mitchell Kovacs on 2018-01-19.
+ * Store and manipulate GPS coordinate data.
+ *
+ * @author Mitchell Kovacs
  */
-
 public class GpsCoordinates {
     private double latitude;
     private double longitude;
