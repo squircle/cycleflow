@@ -27,7 +27,7 @@ Developed in 2018 alongside the `cycleflow-hw` base station component.
 * Requires Google Maps API key (NOT PROVIDED)
 * For full experience, deployment of CycleFlow-compatible base stations is required.  
 
-# How to build
+## How to build
 * Import project into Android Studio
 * Any missing Android or Google dependencies can then be automatically installed
 * Build project
