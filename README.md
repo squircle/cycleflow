@@ -1,11 +1,16 @@
 # CycleFlow Android Client
 ***
 ```
-  
-      .-``'      _o
-    .`   .`   _ \<_
-_.-'     '.__(_)/(_)____________
+                              \_____/
+                             / .   . \
+                           _|_________|_
+                          | |         | |
+                          | |         | |
+      .-``'      _o       '-|_________|-'
+    .`   .`   _ \<_           | | | | 
+_.-'     '.__(_)/(_)__________'-' '-'
 ```
+
 Client component for CEG 4912/4913 Capstone Project at the University of Ottawa.
 
 Developed in 2018 alongside the `cycleflow-hw` base station component.
