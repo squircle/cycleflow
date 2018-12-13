@@ -1,7 +1,11 @@
 package ca.cloudsynergy.cycleflow.station;
 
-import ca.cloudsynergy.cycleflow.location.Direction;
-
+/**
+ * Store and manipulate Entrance data.
+ *
+ * @author Mitchell Kovacs
+ * @author Noah Kruiper
+ */
 public class Entrance {
 
     private LightType type;
@@ -55,15 +59,15 @@ public class Entrance {
     }
 
 
-    public void updateLightTimer(){
-        if(timeToNextLight > 0){
+    public void updateLightTimer() {
+        if (timeToNextLight > 0) {
             timeToNextLight--;
         }
     }
 
-    public void flipLightTimer(int time){
+    public void flipLightTimer(int time) {
         timeToNextLight = time;
-        switch (currentState){
+        switch (currentState) {
             case GREEN:
                 currentState = LightState.RED;
                 break;

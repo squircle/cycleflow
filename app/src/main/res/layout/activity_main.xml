@@ -7,6 +7,72 @@
     android:minHeight="0dp"
     tools:context="ca.cloudsynergy.cycleflow.MainActivity">
 
+    <!-- Top area: station name, light status, speed advice, user speed -->
+
+    <android.support.constraint.Guideline
+        android:id="@+id/guideline_vertical_top"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.6" />
+
+    <ImageView
+        android:id="@+id/cyclist_speed_image"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:adjustViewBounds="true"
+        app:layout_constraintBottom_toTopOf="@+id/scroll_area"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/guideline_vertical_top"
+        app:srcCompat="@drawable/cyclist_icon_text" />
+
+    <TextView
+        android:id="@+id/speed_advice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        android:text=""
+        android:textColor="@android:color/white"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/cyclist_speed_image"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/cyclist_speed_image"
+        app:layout_constraintTop_toBottomOf="@+id/station_name" />
+
+    <TextView
+        android:id="@+id/user_speed_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="48dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="24dp"
+        android:text="-"
+        android:textColor="@android:color/white"
+        android:textSize="38sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@+id/light_status"
+        app:layout_constraintEnd_toEndOf="@+id/cyclist_speed_image"
+        app:layout_constraintStart_toStartOf="@+id/cyclist_speed_image"
+        app:layout_constraintTop_toTopOf="@+id/cyclist_speed_image" />
+
+    <TextView
+        android:id="@+id/station_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:text="(No station in range)"
+        android:textColor="@android:color/white"
+        android:textSize="34sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
         android:id="@+id/light_status"
@@ -18,19 +84,22 @@
         android:layout_marginTop="8dp"
         android:layout_marginEnd="16dp"
         android:background="@drawable/symbol_light"
-        android:text="-"
+        android:text="\?"
         android:textAlignment="center"
         android:textColor="#f8fdf9"
         android:textSize="132sp"
         app:layout_constraintDimensionRatio="H,1:1"
-        app:layout_constraintEnd_toStartOf="@+id/guideline"
+        app:layout_constraintEnd_toStartOf="@+id/guideline_vertical_top"
         app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/station_name" />
 
 
+
+    <!-- Scrollview: Map, Simulator, Debugging information -->
+
     <ScrollView
-        android:id="@+id/scrollView2"
+        android:id="@+id/scroll_area"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
@@ -41,7 +110,7 @@
             android:layout_height="wrap_content">
 
             <android.support.constraint.Guideline
-                android:id="@+id/guideline_vertical"
+                android:id="@+id/guideline_vertical_bottom"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
@@ -155,7 +224,7 @@
                 android:layout_marginStart="24dp"
                 android:layout_marginTop="8dp"
                 android:text="@string/bearing_label"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/longitude_text" />
 
             <TextView
@@ -193,7 +262,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/station_count"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/last_update_time_text" />
 
             <TextView
@@ -203,7 +272,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/last_update_time_text" />
 
             <TextView
@@ -213,7 +282,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/selected_station_text" />
 
             <TextView
@@ -223,7 +292,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/distance_to_intersection_label"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/selected_station_text" />
 
             <TextView
@@ -233,7 +302,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/station_entrance"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/distance_to_intersection_text" />
 
             <TextView
@@ -243,7 +312,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/distance_to_intersection_text" />
 
             <TextView
@@ -253,7 +322,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/station_current_light"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/selected_entrance_text" />
 
             <TextView
@@ -263,7 +332,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/selected_entrance_text" />
 
             <TextView
@@ -273,7 +342,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/station_time_to_change"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/entrance_light_text" />
 
             <TextView
@@ -283,7 +352,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/entrance_light_text" />
 
             <TextView
@@ -339,7 +408,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/approach_station_lat"
-                app:layout_constraintEnd_toStartOf="@id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_name" />
 
             <TextView
@@ -349,7 +418,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@id/guideline_vertical"
+                app:layout_constraintStart_toEndOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_name" />
 
             <TextView
@@ -359,7 +428,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/approach_station_long"
-                app:layout_constraintEnd_toStartOf="@id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_lat" />
 
             <TextView
@@ -369,7 +438,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@id/guideline_vertical"
+                app:layout_constraintStart_toEndOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_lat" />
 
             <TextView
@@ -379,7 +448,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/approach_station_rssi"
-                app:layout_constraintEnd_toStartOf="@id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_long" />
 
             <TextView
@@ -389,7 +458,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@id/guideline_vertical"
+                app:layout_constraintStart_toEndOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_long" />
 
             <TextView
@@ -399,7 +468,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toEndOf="@id/guideline_vertical"
+                app:layout_constraintStart_toEndOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_rssi" />
 
             <TextView
@@ -409,7 +478,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/approach_station_num_entrances"
-                app:layout_constraintEnd_toStartOf="@id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/approach_station_rssi" />
 
             <TextView
@@ -419,7 +488,7 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/station_selected"
-                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintEnd_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/station_count_text" />
 
             <TextView
@@ -429,7 +498,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:text="-"
-                app:layout_constraintStart_toStartOf="@+id/guideline_vertical"
+                app:layout_constraintStart_toStartOf="@+id/guideline_vertical_bottom"
                 app:layout_constraintTop_toBottomOf="@+id/station_count_text" />
 
 
@@ -438,7 +507,7 @@
                 android:id="@+id/map"
                 android:name="com.google.android.gms.maps.SupportMapFragment"
                 android:layout_width="match_parent"
-                android:layout_height="300dp"
+                android:layout_height="370dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="8dp"
@@ -451,72 +520,6 @@
 
         </android.support.constraint.ConstraintLayout>
     </ScrollView>
-
-    <android.support.constraint.Guideline
-        android:id="@+id/guideline"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.6" />
-
-    <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="8dp"
-        android:adjustViewBounds="true"
-        app:layout_constraintBottom_toTopOf="@+id/scrollView2"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/guideline"
-        app:srcCompat="@drawable/cyclist_icon_text" />
-
-    <TextView
-        android:id="@+id/speed_advice"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="8dp"
-        android:text="-"
-        android:textColor="@android:color/white"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@+id/imageView"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/imageView"
-        app:layout_constraintTop_toBottomOf="@+id/station_name" />
-
-    <TextView
-        android:id="@+id/user_speed"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="48dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="24dp"
-        android:text="-"
-        android:textColor="@android:color/white"
-        android:textSize="38sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toBottomOf="@+id/light_status"
-        app:layout_constraintEnd_toEndOf="@+id/imageView"
-        app:layout_constraintStart_toStartOf="@+id/imageView"
-        app:layout_constraintTop_toTopOf="@+id/imageView" />
-
-    <TextView
-        android:id="@+id/station_name"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp"
-        android:text="-"
-        android:textSize="36sp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-
 
 
 </android.support.constraint.ConstraintLayout>

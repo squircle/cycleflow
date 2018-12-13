@@ -35,15 +35,12 @@ import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
@@ -60,9 +57,9 @@ import ca.cloudsynergy.cycleflow.station.Entrance;
 import ca.cloudsynergy.cycleflow.station.StationInfo;
 import ca.cloudsynergy.cycleflow.synergy.Synergy;
 
-/*
+/**
  * Main class for CycleFlow Android Application
- *
+ * <p>
  * Some code based on DeviceControlActivity.java from Google Samples on Github:
  * https://github.com/googlesamples/android-BluetoothLeGatt/
  *
@@ -149,16 +146,17 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         // This is dealt with using onStart(); - should be ok to leave this here
         requestingLocationUpdates = false; // Wait until permissions have been set.
 
+        // List of found stations
         stationList = new ArrayList<>();
+        // Link together modules
         synergy = new Synergy();
 
         // Create testing station
         ArrayList<Entrance> list = new ArrayList<>();
-        Entrance e1 = new Entrance((byte)0,(byte)(180/1.5),(byte)30);
+        Entrance e1 = new Entrance((byte) 0, (byte) (180 / 1.5), (byte) 30);
         list.add(e1);
-        StationInfo testStation = new StationInfo(45.421267, -75.685106, "Test Station", -50, 1, list, System.currentTimeMillis());
-
-        stationList.add(testStation);
+        //StationInfo testStation = new StationInfo(45.422417, -75.683453, "Test Station", -50, 1, list, System.currentTimeMillis(), System.currentTimeMillis());
+        //stationList.add(testStation);
 
         createLocationCallback();
         createLocationRequest();
@@ -181,7 +179,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         stationCurrentLightTextView = findViewById(R.id.entrance_light_data);
         stationTimeToLightChangeTextView = findViewById(R.id.light_time_to_change_data);
 
-        userSpeed = findViewById(R.id.user_speed);
+        userSpeed = findViewById(R.id.user_speed_value);
         stationName = findViewById(R.id.station_name);
         lightStatus = findViewById(R.id.light_status);
         speedAdvice = findViewById(R.id.speed_advice);
@@ -228,9 +226,9 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             @Override
             public void onFinish() {
-                try{
+                try {
                     update();
-                }catch(Exception e){
+                } catch (Exception e) {
                     Log.e("Error", "Error: " + e.toString());
                 }
             }
@@ -255,27 +253,27 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         super.onDestroy();
     }
 
-    private void update(){
+    private void update() {
         // Update time of test station so it doesn't expire, and flip light timer if needed
-        for(StationInfo station : stationList){
-            if(station.name.equals("Test Station")){
-                station.time = System.currentTimeMillis()-2000;
-                if(station.entrances.get(0).getTimeToNextLight() == 0){
+        for (StationInfo station : stationList) {
+            if (station.name.equals("Test Station")) {
+                station.time = System.currentTimeMillis() - 2000;
+                if (station.entrances.get(0).getTimeToNextLight() == 0) {
                     station.flipTimers(30);
                 }
             }
         }
 
         // Update station timers if they were last seen more than 1 second ago
-        for(StationInfo station : stationList){
-            if(station.time < System.currentTimeMillis()-1000){
+        for (StationInfo station : stationList) {
+            if (station.timerLastUpdated < System.currentTimeMillis() - 1000) {
                 station.updateTimers();
             }
         }
 
         determineStation();
 
-
+        updateLocationUi();
 
         // Restart timer
         updater.start();
@@ -320,14 +318,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
 
         if (currentLocation != null) {
-            // TODO: Increase API level for finding accuracy?
+            // TODO: Possible future addition could be to increase API level for finding accuracy
             latitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLatitude()));
             longitudeTextView.setText(String.format(Locale.ENGLISH, "%f", currentLocation.getLongitude()));
             currentSpeedTextView.setText(String.format(Locale.ENGLISH, "%f m/s", currentLocation.getSpeed()));
             bearingTextView.setText(String.format(Locale.ENGLISH, "%f degrees", currentLocation.getBearing()));
             lastUpdateTimeTextView.setText(String.format(Locale.ENGLISH, "%s", lastUpdateTime));
         }
-
         // Determine which station is being approached with updated information
         determineStation();
     }
@@ -341,6 +338,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     /**
      * Return the current state of the permissions needed.
+     *
      * @return If the current permissions are granted.
      */
     private boolean checkPermissions() {
@@ -359,10 +357,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                             Log.i(TAG, task.getResult().toString());
                             synergy.setCurrentLocation(task.getResult());
                             lastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-                            updateLocationUi();
                         } else {
                             Log.w(TAG, "getLastLocation:exception", task.getException());
-                            // TODO: Show snackbar for no location detected.
                         }
                     }
                 });
@@ -377,7 +373,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         // request previously, but didn't check the "Don't ask again" checkbox.
         if (shouldProvideRationale) {
             Log.i(TAG, "Displaying permission rationale to provide additional context.");
-            // TODO: Display rationale. Maybe use a Snackbar?
             // Example in this: https://github.com/googlesamples/android-play-location/blob/master/BasicLocationSample/app/src/main/java/com/google/android/gms/location/sample/basiclocationsample/MainActivity.java
         } else {
             Log.i(TAG, "Requesting permission.");
@@ -406,11 +401,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     Log.i(TAG, "Permission Granted.");
                     requestingLocationUpdates = true;
                     getLastLocation();
-                }
-                 else {
+                } else {
                     // Permission Denied.
                     Log.i(TAG, "Permission Denied.");
-                    // TODO: Handle this.
+                    Toast.makeText(this, "FINE LOCATION PERMISSION REQUIRED", Toast.LENGTH_LONG).show();
                 }
                 break;
             case PR_ENABLE_BT:
@@ -420,7 +414,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 } else {
                     // User did not enable Bluetooth or an error occurred
                     Log.d(TAG, "Error enabling Bluetooth");
-                    Toast.makeText(this, "Error enabling Bluetooth", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Error enabling Bluetooth", Toast.LENGTH_LONG).show();
                     finish();
                 }
                 break;
@@ -437,24 +431,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
      */
     private void scanLeDevice(final boolean enable) {
         if (enable) {
-            // stops scanning after 10 seconds
-            /*
-            mHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    mScanning = false;
-                    bluetoothLeScanner.stopScan(mLeScanCallback);
-                }
-            }, 20000);
-            */
-
             // Using highest-power mode for scanning
             ScanSettings scanSettings = new ScanSettings.Builder()
                     .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                     .build();
             // Not using filters due to many reported bugs in Android
-            // Supposed to filter manually
-            ArrayList<ScanFilter> filters = new ArrayList<ScanFilter>();
+            ArrayList<ScanFilter> filters = new ArrayList<>();
             mScanning = true;
             bluetoothLeScanner.startScan(filters, scanSettings, mLeScanCallback);
         } else {
@@ -473,16 +455,16 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Log.i("result", result.toString());
 
             // Get transmitted bytes from the broadcast data from both packets
-            byte [] cfData = result.getScanRecord().getBytes();
+            byte[] cfData = result.getScanRecord().getBytes();
 
             // Only if the right bytes match should we attempt to create StationInfo
-            if (cfData != null && cfData[1] == (byte)0xFF && cfData[2] == (byte)0xFF && cfData[3] == (byte)0xFF && cfData[10] == (byte)0xCF) {
+            if (cfData != null && cfData[1] == (byte) 0xFF && cfData[2] == (byte) 0xFF && cfData[3] == (byte) 0xFF && cfData[10] == (byte) 0xCF) {
 
                 // Generate String version of received data
                 String text = "";
-                for(int i = 0; i < cfData.length; i++){
+                for (int i = 0; i < cfData.length; i++) {
                     text = text + cfData[i];
-                    if(i == cfData.length/2 - 1){
+                    if (i == cfData.length / 2 - 1) {
                         text = text + "\n";
                     }
                 }
@@ -492,36 +474,32 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 StationInfo info = null;
                 try {
                     info = StationInfo.StationInfoBuilder(cfData, result.getRssi());
-                    info.time = result.getTimestampNanos();
-                } catch (Exception e){
+                    info.time = System.currentTimeMillis();
+                } catch (Exception e) {
                     Log.e("ScanResult", "Error creating Station Info.", e);
                 }
+
                 // If the station info exists, update it to the latest-received data
-                if(info != null){
+                if (info != null) {
                     boolean found = false;
-                    for(int i = 0; i < stationList.size(); i++){
-                        if(stationList.get(i).id.equals(info.id)){
+                    for (int i = 0; i < stationList.size(); i++) {
+                        if (stationList.get(i).id.equals(info.id)) {
+                            // Update station timers if they have not changed and it has been more
+                            if (info.time < System.currentTimeMillis() - 1000) {
+                                info.updateTimers();
+                            }
+
                             found = true;
                             stationList.remove(i);
-                            stationList.add(info);
-                            Log.i("ScanResult","Updated station info for " + info.name + " in the stationList");
+                            stationList.add(i, info);
+                            Log.i("ScanResult", "Updated station info for " + info.name + " in the stationList");
                         }
                     }
 
-                    if(!found){
+                    if (!found) {
                         stationList.add(info);
                     }
-
-                    // Display data
-                    // TODO UPDATE
-//                    approachStationRawDataTextView.setText(text);
-//                    approachStationNameTextView.setText(info.name);
-//                    approachStationLatTextView.setText(String.valueOf(info.coordinates.getLatitude()));
-//                    approachStationLongTextView.setText(String.valueOf(info.coordinates.getLongitude()));
-//                    approachStationRssiTextView.setText(String.valueOf(info.rssi));
-//                    approachStationNumEntrancesTextView.setText(String.valueOf(info.numEntrances));
                 }
-
             } else {
                 Log.i("DATA", "no match");
             }
@@ -546,12 +524,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // Removing old stations
         ArrayList<StationInfo> oldStations = new ArrayList<>();
-        for(StationInfo station : stationList){
-            if(station.time < System.currentTimeMillis()-15000){
+        for (StationInfo station : stationList) {
+            if (station.time < System.currentTimeMillis() - 15000) {
                 oldStations.add(station);
             }
         }
-        for(StationInfo station : oldStations){
+        for (StationInfo station : oldStations) {
             stationList.remove(station);
         }
 
@@ -561,11 +539,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         ArrayList<StationInfo> validStations = new ArrayList<>();
         // Determine user direction
         Float userBearing = synergy.getCurrentLocation().getBearing();
-        for(StationInfo station : stationList){
+        for (StationInfo station : stationList) {
             double bDif = GpsCoordinates.calculateBearingDiff(
                     userBearing,
                     GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates));
-            if(bDif < 90){
+            if (bDif <= 90) {
                 validStations.add(station);
             }
         }
@@ -573,13 +551,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         // eliminate stations without an entrance with a valid angle
         // criteria: the difference between entrance bearing or user/user-station must be <=80
         ArrayList<StationInfo> nextValid = new ArrayList<>();
-        for(StationInfo station : validStations){
-            for(Entrance entrance : station.entrances){
+        for (StationInfo station : validStations) {
+            for (Entrance entrance : station.entrances) {
                 double entrance_user = GpsCoordinates.calculateBearingDiff(
-                        synergy.getCurrentLocation().getBearing(),entrance.getBearing());
+                        synergy.getCurrentLocation().getBearing(), entrance.getBearing());
                 double entrance_user_station = GpsCoordinates.calculateBearingDiff(
                         GpsCoordinates.calculateBearing(synergy.getCurrentCoordinates(), station.coordinates), entrance.getBearing());
-                if((entrance_user <= 80) || (entrance_user_station <= 80)){
+                if ((entrance_user <= 80) || (entrance_user_station <= 80)) {
                     nextValid.add(station);
                     break;
                 }
@@ -588,11 +566,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // select the closest station
         double distance = 0;
-        for(StationInfo station : nextValid){
-            if(selectedStation == null){
+        for (StationInfo station : nextValid) {
+            if (selectedStation == null) {
                 selectedStation = station;
                 distance = GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), selectedStation.coordinates);
-            } else if (GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), station.coordinates) < distance){
+            } else if (GpsCoordinates.calculateDistance(synergy.getCurrentCoordinates(), station.coordinates) < distance) {
                 selectedStation = station;
             }
         }
@@ -615,7 +593,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                             entrance.getBearing());
                 } else {
                     double entranceBearingDiff = GpsCoordinates.calculateBearingDiff(bearingToIntersection,
-                                    entrance.getBearing());
+                            entrance.getBearing());
                     if (entranceBearingDiff < bearingDiff) {
                         closestEntrance = entrance;
                         bearingDiff = entranceBearingDiff;
@@ -638,37 +616,45 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             // Set end-user GUI elements
 
-            if(synergy.getDesiredEntrance().getCurrentState() == Entrance.LightState.GREEN){
+            if (synergy.getDesiredEntrance().getCurrentState() == Entrance.LightState.GREEN) {
                 GradientDrawable drawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.symbol_light, null);
                 drawable.setColor(Color.parseColor("#03ae3c")); // green
                 lightStatus.setBackground(drawable);
-            } else {
+            } else if (synergy.getDesiredEntrance().getCurrentState() == Entrance.LightState.RED) {
                 GradientDrawable drawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.symbol_light, null);
                 drawable.setColor(Color.parseColor("#d50000")); // red
+                lightStatus.setBackground(drawable);
+            } else {
+                GradientDrawable drawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.symbol_light, null);
+                drawable.setColor(Color.parseColor("#dab000")); // gray
                 lightStatus.setBackground(drawable);
             }
             lightStatus.setText(String.format(Locale.ENGLISH, "%d", synergy.getDesiredEntrance().getTimeToNextLight()));
             stationName.setText(synergy.getCurrentStation().name);
 
             // Determine if the user is going fast enough
-            if(synergy.getDistanceToStation() > synergy.getDesiredEntrance().getTimeToNextLight()*synergy.getCurrentLocation().getSpeed()){
+            if (synergy.getDistanceToStation() > synergy.getDesiredEntrance().getTimeToNextLight() * synergy.getCurrentLocation().getSpeed() &
+                    synergy.getDesiredEntrance().getCurrentState() == Entrance.LightState.GREEN) {
                 speedAdvice.setText("Speed up!");
+            } else if (synergy.getDesiredEntrance().getCurrentState() == Entrance.LightState.RED &&
+                    synergy.getCurrentLocation().getSpeed() * synergy.getDesiredEntrance().getTimeToNextLight() > synergy.getDistanceToStation()) {
+                speedAdvice.setText("Slow down!");
             } else {
                 speedAdvice.setText("Speed OK");
             }
 
         } else {
             GradientDrawable drawable = (GradientDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.symbol_light, null);
-            drawable.setColor(Color.parseColor("#616161")); // gray
+            drawable.setColor(Color.parseColor("#dab000")); // gray
             lightStatus.setBackground(drawable);
-            lightStatus.setText("-");
-            stationName.setText("-");
-            speedAdvice.setText("-");
+            lightStatus.setText("?");
+            stationName.setText("(No station)");
+            speedAdvice.setText("");
         }
-        int speed = (int)(synergy.getCurrentLocation().getSpeed()*3.6);
-        if(speed > 0 && speed < 100){
+        int speed = (int) (synergy.getCurrentLocation().getSpeed() * 3.6);
+        if (speed > 0 && speed < 100) {
             userSpeed.setText(String.valueOf(speed));
-        }else {
+        } else {
             userSpeed.setText("0");
         }
         lightStatus.setGravity(Gravity.CENTER);
@@ -678,7 +664,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         LatLng user = new LatLng(synergy.getCurrentCoordinates().getLatitude(), synergy.getCurrentCoordinates().getLongitude());
         mMap.addMarker(new MarkerOptions().position(user).title("User").icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_bike_bordered_small)));
 
-        if(synergy.getCurrentStation() != null){
+        if (synergy.getCurrentStation() != null) {
             // Add a marker for the station
             LatLng sta = new LatLng(synergy.getCurrentStation().coordinates.getLatitude(), synergy.getCurrentStation().coordinates.getLongitude());
             mMap.addMarker(new MarkerOptions().position(sta).title(synergy.getCurrentStation().name).icon(BitmapDescriptorFactory.fromResource(R.drawable.icon_isometric_light_small)));
@@ -686,7 +672,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         // Move map to user location
         mMap.moveCamera(CameraUpdateFactory.newLatLng(user));
-        mMap.moveCamera(CameraUpdateFactory.zoomTo((float)16.5));
+        mMap.moveCamera(CameraUpdateFactory.zoomTo((float) 16.5));
 
     }
 
@@ -695,7 +681,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
     }
-
 
 
 }
