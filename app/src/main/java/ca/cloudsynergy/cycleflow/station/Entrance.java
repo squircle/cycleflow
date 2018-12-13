@@ -1,7 +1,11 @@
 package ca.cloudsynergy.cycleflow.station;
 
-import ca.cloudsynergy.cycleflow.location.Direction;
-
+/**
+ * Store and manipulate Entrance data.
+ *
+ * @author Mitchell Kovacs
+ * @author Noah Kruiper
+ */
 public class Entrance {
 
     private LightType type;
@@ -9,7 +13,6 @@ public class Entrance {
     private Double bearing;
     private boolean omnidirectional;
     private int timeToNextLight;
-
 
     public Entrance(byte data, byte nHeading, byte stateChangeTime) {
         // Demand Trigger
@@ -53,6 +56,25 @@ public class Entrance {
 
     public Double getBearing() {
         return bearing;
+    }
+
+
+    public void updateLightTimer() {
+        if (timeToNextLight > 0) {
+            timeToNextLight--;
+        }
+    }
+
+    public void flipLightTimer(int time) {
+        timeToNextLight = time;
+        switch (currentState) {
+            case GREEN:
+                currentState = LightState.RED;
+                break;
+            case RED:
+                currentState = LightState.GREEN;
+                break;
+        }
     }
 
     public enum LightType {

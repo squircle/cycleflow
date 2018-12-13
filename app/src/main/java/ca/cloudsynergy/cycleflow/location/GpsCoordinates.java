@@ -1,9 +1,10 @@
 package ca.cloudsynergy.cycleflow.location;
 
 /**
- * Created by Mitchell Kovacs on 2018-01-19.
+ * Store and manipulate GPS coordinate data.
+ *
+ * @author Mitchell Kovacs
  */
-
 public class GpsCoordinates {
     private double latitude;
     private double longitude;
@@ -80,7 +81,7 @@ public class GpsCoordinates {
     public static double calculateBearingDiff(double bearing1, double bearing2) {
         // The max possible difference between two bearings would be 180
         if (Math.abs(bearing1 - bearing2) > 180) {
-            if (bearing1 > bearing2) {
+            if (bearing1 < bearing2) {
                 bearing1 += 360;
             } else {
                 bearing2 += 360;
