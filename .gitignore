@@ -332,3 +332,6 @@ TSWLatexianTemp*
 
 # standalone packages
 *.sta
+
+# VS Code
+.vscode/
