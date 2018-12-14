@@ -1,0 +1,366 @@
+% vim: set fenc=utf-8 ft=latex
+% !Mode:: "TeX:UTF-8"
+% !TEX encoding = UTF-8 Unicode 
+% -*- mode: latex -*-
+% -*- coding: UTF-8 -*-
+% kate: encoding utf-8;
+%
+% !TEX TS-program = xelatex
+%
+% IMPORTANT Note: This file is UTF-8 encoded! 
+%                 You should see some umlauts here: ÄÖÜäöü 
+
+\documentclass[12pt, oneside]{article}
+\usepackage{geometry}
+\geometry{letterpaper}
+
+\usepackage{enumitem}
+\usepackage[binary-units=true,per-mode=symbol]{siunitx}
+\usepackage{fancyhdr}
+\usepackage[parfill]{parskip}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage{awesomebox}
+\usepackage{xcolor}
+\usepackage[cache=false]{minted}
+\usepackage{bytefield}
+\usepackage{underscore}
+
+\definecolor{graybg}{gray}{0.95}
+\definecolor{bashful}{HTML}{A6DAF3}
+\definecolor{seafoam}{HTML}{D7F1F8}
+\definecolor{frog}{HTML}{E2EBA5}
+\definecolor{beyond}{HTML}{4A8FBA}
+
+\newcommand{\colorwordbox}[4][rlbt]{%
+    \rlap{\wordbox[#1]{#3}{\color{#2}\rule{\dimexpr\width-0.4pt}{\dimexpr\height-0.4pt}}}%
+    \wordbox[#1]{#3}{#4}}
+\newcommand{\colorbitbox}[4][lrbt]{%
+    \rlap{\bitbox[#1]{#3}{\color{#2}\rule{\dimexpr\width-0.4pt}{\dimexpr\height-0.4pt}}}%
+    \bitbox[#1]{#3}{#4}}
+
+% title
+\title{CycleFlow Integration Guide}
+\author{The CycleFlow Team\\cycleflow@squircle.ca}
+\date{Version 1.0}
+
+% header & footer
+\pagestyle{fancy}
+\fancyhead{}
+\fancyhead[L]{CycleFlow Integration Guide v1.0}
+\fancyhead[R]{\thepage}
+\fancyfoot{}
+\fancyfoot[L]{\footnotesize \copyright~2018 CycleFlow\\Proudly developed in Canada.}
+
+
+\begin{document}
+\pagestyle{fancy}
+
+\maketitle
+\thispagestyle{empty} % suppress page number on title page
+\pagebreak
+
+\section*{Important Notes}
+\importantbox{
+CycleFlow was not designed to replace any safety-critical systems. CycleFlow's use should be limited to augmenting existing traffic signals, not as a substitute. All hardware and software implementations of the CycleFlow protocol \textbf{must} degrade safely.
+}
+
+\importantbox{
+CycleFlow is a fourth-year engineering design project. It was not developed by licensed professional engineers, nor has it been scrutinized by any regulatory bodies.
+}
+
+This guide is written for users who wish to use the CycleFlow protocol with hardware or software other than the reference implementations provided at \url{https://github.com/squircle/cycleflow}. It describes the communication protocol in detail, and outlines general considerations for development. 
+
+\notebox{
+This  is \textbf{not} a step-by-step development guide. It exists as a reference to aid interoperability of CycleFlow deployments on diverse platforms. 
+}
+
+\section{System Overview}
+CycleFlow is a system that transmits traffic signal timing information to cyclists so they can preserve momentum and move easily through urban areas. The protocol uses standard Bluetooth technology that can be implemented on a wide range of client and base station hardware. 
+
+A high-level overview of CycleFlow in action is the following:
+\begin{enumerate}
+\item Base station receives timing information from traffic signal controller
+\item Base station updates Bluetooth broadcast with updated information
+\item Client receives and decodes Bluetooth broadcast
+\item Client determines which intersection user is approaching and their ETA
+\item Based on this data, client notifies user of speed recommendation
+\end{enumerate}
+
+The reference implementation is based on Nordic Semiconductor's nRF52 Bluetooth platform (base station) and the Android smartphone platform (client). CycleFlow should work on any platform that meets the hardware requirements detailed below; it was designed to be easily integrated as it has no hardware-specific dependencies.
+
+\notebox{
+This is only a brief synopsis of CycleFlow's operation. For more information, please see the overview documentation on the project's site.
+}
+
+\section{Hardware Requirements}
+The CycleFlow base station must support, at minimum:
+\begin{itemize}
+\item Bluetooth Low Energy (known as Bluetooth 4.0, Bluetooth LE, BLE, or Bluetooth Smart)
+\begin{itemize}
+\item Non-connectable, undirected Generic Access Profile (GAP) advertising
+\item Fully customizable GAP advertising packets with Manufacturer Specific Data type (\texttt{0xFF})
+\end{itemize}
+
+\item Traffic data exchange interface
+\begin{itemize}
+\item Generally UART (serial)
+\item Requires custom translation layer for each type of traffic signal controller
+\end{itemize}
+\end{itemize}
+
+The following features may be desirable for real-world implementations:
+\begin{itemize}
+\item External antenna support
+\item Uninterruptable power or battery backup
+\item Weather sealing or ruggedizing
+\item Debugging or logging interface (\textit{e.g.} display, SD card, etc.)
+\end{itemize}
+
+The reference implementation consists of the following hardware:
+\begin{itemize}
+\item Nordic Semiconductor nRF52832 BLE SoC
+\begin{itemize}
+\item ARM Cortex M4F processor
+\item Bluetooth 5 and BLE compliant radio
+\item Nordic S132 SoftDevice Bluetooth-qualified protocol stack
+\item Hardware UART (requires level shifting for RS-232 integration)
+\item GPIO (for monitoring state, and future integrations)
+\item Adjustable transmit power (+4 to -20 dBm and external antenna support with impedance matching network)
+\end{itemize}
+
+\item Android 5.0 Lollipop smartphone platform
+\begin{itemize}
+\item Full BLE protocol stack support (with compliant hardware)
+\item GPS using Google Play Services Location API
+\end{itemize}
+\end{itemize}
+
+\warningbox{
+Hardware that meets the above requirements on paper may not function as expected in the field. Nothing can replace real-world integration testing to discover quirks or incompatibilities. 
+}
+
+\section{CycleFlow Protocol}
+
+\subsection{Bluetooth Advertising Format}
+The key interchange format of CycleFlow is BLE advertisement frames. In each advertising interval, up to two frames are broadcast on the dedicated broadcast channels. Each frame has a payload of up to \SI{31}{\byte}, depending on 
+\begin{itemize}
+\item \textbf{Advertising frame:} contains safety-critical information like position, light timing, etc.
+\item \textbf{Scan response frame:} contains the friendly (human-readable) intersection name (UTF-8 format)
+\end{itemize}
+
+\notebox{
+The scan response frame is only sent in response to a scan request from a client BLE device. In practice, this is usually handled by the BLE client when scanning for peripherals, but may depend on its API.
+}
+
+\notebox{
+Minimum BLE advertising interval (by BLE specification): \SI{100}{\milli\second}\newline
+Recommended BLE advertising interval: \SI{100}{\milli\second}
+}
+
+\subsubsection{Advertising Frame}
+The advertising frame payload has a length of $13 + (3 \times n)$ bytes, where $n$ is the number of intersection entrances. 
+
+\notebox{
+A single advertising frame can broadcast up to 6 entrances, sufficient for even the most complex entrances. However, if more than 6 entrances are required, multiple base stations can be situated at an intersection. The disambiguation between base stations is performed by the client.
+}
+
+The structure of the advertising frame is as follows (\textit{n.b.} the diagram is 32 bits wide and contains 31 bytes in total):\\
+
+\begin{bytefield}[bitwidth=1.1em]{32}
+\bitheader{0-31}\\
+
+\begin{rightwordgroup}{BLE \\ Header}
+\colorbitbox{lightgray}{8}{Length} & \colorbitbox{lightgray}{8}{GAP AD type} & \colorbitbox{lightgray}{16}{Company ID}
+\end{rightwordgroup}\\
+
+\colorbitbox{graybg}{24}{Latitude} & \colorbitbox{graybg}{8}{Longitude $\longrightarrow$} \\ 
+
+\colorbitbox{graybg}{16}{$\longleftarrow$ Longitude} & \colorbitbox{graybg}{8}{Magic number} & \colorbitbox{lightgray}{8}{Reserved}\\
+
+\colorbitbox{lightgray}{8}{Reserved} & \colorbitbox{lightgray}{6}{Reserved} & \colorbitbox{seafoam}{1}{D} & \colorbitbox{seafoam}{1}{S} & \colorbitbox{seafoam}{8}{Approach bearing} & \colorbitbox{seafoam}{8}{State change time}\\
+
+\colorbitbox{lightgray}{6}{Reserved} & \colorbitbox{frog}{1}{D} & \colorbitbox{frog}{1}{S} & \colorbitbox{frog}{8}{Approach bearing} & \colorbitbox{frog}{8}{State change time} & \colorbitbox{lightgray}{6}{Reserved} & \colorbitbox{beyond}{1}{D} & \colorbitbox{beyond}{1}{S}\\
+
+\colorbitbox{beyond}{8}{Approach bearing} & \colorbitbox{beyond}{8}{State change time} & \colorbitbox{lightgray}{6}{Reserved} & \colorbitbox{seafoam}{1}{D} & \colorbitbox{seafoam}{1}{S} & \colorbitbox{seafoam}{8}{Approach bearing}\\
+
+\colorbitbox{seafoam}{8}{State change time} & \colorbitbox{lightgray}{6}{Reserved} & \colorbitbox{frog}{1}{D} & \colorbitbox{frog}{1}{S} & \colorbitbox{frog}{8}{Approach bearing} & \colorbitbox{frog}{8}{State change time}\\
+
+\colorbitbox{lightgray}{6}{Reserved} & \colorbitbox{beyond}{1}{D} & \colorbitbox{beyond}{1}{S} & \colorbitbox{beyond}{8}{Approach bearing} & \colorbitbox{beyond}{8}{State change time}
+\end{bytefield}
+
+Each field is described below:
+
+\begin{itemize}
+\item \textbf{Length}
+
+Payload length in bytes, excluding the length field. Minimum value \texttt{0x0F} for one entrance, increasing by increments of 3 to a maximum value of \texttt{0x1E} for six entrances.
+
+\tipbox{
+Many Bluetooth hardware APIs calculate this automatically, so it doesn't need to be explicitly included.
+}
+
+\item \textbf{GAP AD type}
+
+\texttt{0xFF}, a constant, indicating manufacturer-specific data follows (\textit{i.e.} not following a standard Bluetooth SIG-defined data layout)
+
+\item \textbf{Company ID}
+
+A constant field, identifying the manufacturer that defines the format for the following data. \texttt{0xFFFF} is reserved for testing/internal use. CycleFlow has not yet obtained a permanent ID from Bluetooth SIG.
+
+\item \textbf{Latitude}
+
+A 24-bit big-endian integer containing an encoded representation of the base station's latitude. See Section~\ref{latlong} below for encoding details.
+
+\item \textbf{Longitude}
+
+A 24-bit big-endian integer containing an encoded representation of the base station's longitude. See Section~\ref{latlong} below for encoding details.
+
+\item \textbf{Magic Number}
+
+\texttt{0xCF}, a constant, positively identifying a CycleFlow base station until a permanent Company ID is obtained. This field may be repurposed in the future, once an ID is obtained.
+
+\item \textbf{Entrance Data}
+
+Each entrance data block -- identified by a colour in the bitfield above -- begins with 6 reserved bits, then follows this format:
+
+\begin{itemize}
+\item \textbf{D --} a bit indicating whether the traffic signal facing this entrance is timer-based (\texttt{0}) or requires a demand trigger (\texttt{1}). If the signal is demand-based (\texttt{1}), a value of 255 (\texttt{0xFF}) in the \textit{State change time} field signifies no demand, and should be interpreted as an absolute stop until this bit changes.
+
+\item \textbf{S --} a bit indicating whether the traffic signal facing this entrance is currently in a blocked (\texttt{0}, \textit{i.e.} amber or red) or permissive (\texttt{1}, \textit{i.e.} green). 
+
+\item \textbf{Approach bearing --} an octet containing the heading for this entrance (\textit{i.e.} the client's heading as they approach this entrance), used to determine which signals apply. This value is normalized in 240 steps of \SI{1.5}{\degree}. Valid values are 0-239 (\texttt{0x00-0xEF}), and 255 (\texttt{0xFF}) for omnidirectional. Values between 240 and 254 (\texttt{0xF0-0xFE}) should not be used.
+
+\item \textbf{State change time --} an octet containing the time to the next state (\textit{i.e.} change in the D bit) in seconds. The maximum value 255 (\texttt{0xFF}) should be interpreted as infinity. 
+\end{itemize}
+\end{itemize}
+
+\subsubsection{Latitude \& Longitude Calculation}\label{latlong}
+Due to space constraints in the protocol, geographic coordinates must be normalized. However, storing each as a 24-bit integer is still sufficiently precise to disambiguate intersections, as the minimum precision (at the equator) is approximately \SI{3}{\metre}. Since the position of a base station shouldn't change under normal operation, none of these floating-point calculations are required on the base station.
+
+\paragraph{Constants} Each calculation involves the use of five constants, given below in both C and Java format:
+\begin{minted}[linenos=true,fontsize=\footnotesize,bgcolor=graybg]{c}
+const unsigned long LATLONG_INT_OFFSET = 8388540;
+
+const unsigned long LATITUDE_TO_INT_FACTOR = 93206;
+const unsigned double LATITUDE_TO_FLOAT_FACTOR = 0x1.6800bf40659a3p-17;
+
+const unsigned long LONGITUDE_TO_INT_FACTOR = 46603;
+const unsigned double LONGITUDE_TO_FLOAT_FACTOR = 0x1.6800bf40659a3p-16;
+\end{minted}
+\begin{minted}[linenos=true,fontsize=\footnotesize,bgcolor=graybg]{java}
+public static final long LATLONG_INT_OFFSET = 8388540;
+
+public static final int LATITUDE_TO_INT_FACTOR = 93206;
+public static final double LATITUDE_TO_FLOAT_FACTOR = 0x1.6800bf40659a3p-17;
+
+public static final int LONGITUDE_TO_INT_FACTOR = 46603;
+public static final double LONGITUDE_TO_FLOAT_FACTOR = 0x1.6800bf40659a3p-16;
+\end{minted}
+
+\tipbox{
+The floating-point factors are stored as IEEE~754 double-precision constants to ensure consistency. No interpretation is required, as these are exact definitions.
+}
+
+\paragraph{Conversion to Integer Format} Use this conversion method when you have identified the geographic coordinates of the intersection, and wish to encode them for use in the base station.
+
+\begin{minipage}{0.5\textwidth}
+\begin{center} \underline{Latitude}\end{center}
+\begin{enumerate}
+\item \textbf{Multiply} floating-point latitude by \texttt{LATITUDE_TO_INT_FACTOR}. 
+\item \textbf{Round} at the units place (removing the fractional part). 
+\item \textbf{Add} \texttt{LATLONG_INT_OFFSET} to the result.
+\end{enumerate}
+\end{minipage}%
+\begin{minipage}{0.5\textwidth}
+\begin{center} \underline{Longitude}\end{center}
+\begin{enumerate}
+\item \textbf{Multiply} floating-point latitude by \texttt{LONGITUDE_TO_INT_FACTOR}. 
+\item \textbf{Round} at the units place (removing the fractional part). 
+\item \textbf{Add} \texttt{LATLONG_INT_OFFSET} to the result.
+\end{enumerate}
+\end{minipage}
+
+
+\paragraph{Conversion to Floating-Point Format} Use this conversion method in the client implementations, to translate an encoded lat/long pair to proper coordinates.
+
+\begin{minipage}{0.5\textwidth}
+\begin{center} \underline{Latitude}\end{center}
+\begin{enumerate}
+\item \textbf{Subtract} \texttt{LATLONG_INT_OFFSET} from the integer latitude. 
+\item \textbf{Signed multiply} the difference by \texttt{LATITUDE_TO_FLOAT_FACTOR}. 
+\item \textbf{Round} the result to 5 decimal places or fewer.
+\end{enumerate}
+\end{minipage}%
+\begin{minipage}{0.5\textwidth}
+\begin{center} \underline{Longitude}\end{center}
+\begin{enumerate}
+\item \textbf{Subtract} \texttt{LATLONG_INT_OFFSET} from the integer longitude. 
+\item \textbf{Signed multiply} the difference by \texttt{LONGITUDE_TO_FLOAT_FACTOR}. 
+\item \textbf{Round} the result to 5 decimal places or fewer.
+\end{enumerate}
+\end{minipage}
+
+A sample Python script to perform the float-to-integer conversion follows:
+
+\begin{minted}[linenos=true,fontsize=\footnotesize,bgcolor=graybg]{python}
+#!/usr/bin/env python3
+
+import sys
+
+print("Usage: latlong.py latitude longitude")
+
+LATLONG_INT_OFFSET = 8388540
+LATITUDE_TO_INT_FACTOR = 93206
+LATITUDE_TO_FLOAT_FACTOR = float.fromhex("0x1.6800bf40659a3p-17")
+LONGITUDE_TO_INT_FACTOR = 46603
+LONGITUDE_TO_FLOAT_FACTOR = float.fromhex("0x1.6800bf40659a3p-16")
+
+latitude = float(sys.argv[1])
+longitude = float(sys.argv[2])
+
+i_latitude = round(latitude * LATITUDE_TO_INT_FACTOR) + LATLONG_INT_OFFSET
+i_longitude = round(longitude * LONGITUDE_TO_INT_FACTOR) + LATLONG_INT_OFFSET
+
+print("Input: {}, {}".format(latitude, longitude))
+print("Output: {} ({}), {} ({})".format(i_latitude, hex(i_latitude), 
+                                        i_longitude, hex(i_longitude)))
+\end{minted}
+
+
+\subsubsection{Scan Response Frame}
+The scan response frame header is four bytes, plus up to 27 bytes of UTF-8 encoded text (for a maximum length of 31 bytes). This text communicates the friendly name of the intersection to the user. The format of the frame is as follows:\\
+
+\begin{bytefield}[bitwidth=1.1em]{32}
+\bitheader{0-31}\\
+
+\begin{rightwordgroup}{BLE \\ Header}
+\colorbitbox{lightgray}{8}{Length} & \colorbitbox{lightgray}{8}{GAP AD type} & \colorbitbox{lightgray}{16}{Company ID}
+\end{rightwordgroup}\\
+
+\wordbox[lrt]{1}{UTF-8 encoded intersection name}\\
+\skippedwords\\
+\wordbox[lr]{1}{}\\
+\bitbox[lb]{24}{} & \bitbox[lt]{8}{}
+\end{bytefield}
+
+The format of the BLE header is the same as the advertisement frame. 
+
+\tipbox{
+Many client implementations will present both the advertisement and scan response frames as a single bitstream. Consider using the length fields to determine where the two frames are divided.
+}\\
+\warningbox{
+Client implementations -- especially those written in memory-unsafe languages -- should implement strict bounds checking to prevent against buffer overruns by malicious BLE advertisements.
+}
+
+\subsection{Reference Implementation}
+The CycleFlow Github repository (\url{https://github.com/squircle/cycleflow}) contains a reference implementation for a base station (using a Nordic Semiconductor nRF52-DK development kit) and a client (using Android). 
+
+\notebox{
+The base station implementation has two modes of operation: static demo, and timer-based demo. The implementation could be easily extended to interface with a traffic signal controller using the pre-built Nordic UART module. 
+}\\
+\notebox{
+Nordic's development kit supports multiple methods of development. The reference implementation uses GCC/Clang and the ARM SDK, but there are multiple fully-featured IDEs and debugging tools available for free or at nominal cost. See \url{https://www.nordicsemi.com/DocLib/Content/User_Guides/getting_started/latest/UG/gs/develop_sw} for more information on software development.
+}
+
+\end{document}
