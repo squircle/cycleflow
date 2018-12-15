@@ -1,34 +1,30 @@
-# CycleFlow Android Client
-***
-```
-                              \_____/
-                             / .   . \
-                           _|_________|_
-                          | |         | |
-                          | |         | |
-      .-``'      _o       '-|_________|-'
-    .`   .`   _ \<_           | | | | 
-_.-'     '.__(_)/(_)__________'-' '-'
-```
+# CycleFlow
 
-Client component for CEG 4912/4913 Capstone Project at the University of Ottawa.
+CycleFlow is a project of Andrew Dam, Mitchell Kovacs, Noah Kruiper, and
+Tyson Moore for the CEG 4912/4913 Capstone design project courses at the
+University of Ottawa. 
 
-Developed in 2018 alongside the `cycleflow-hw` base station component.
+CycleFlow encourages the efficient use of active transportation in cities by
+transmitting traffic signal timing information to cyclists. This allows them to
+conserve momentum and reduces effort to safely glide through urban corridors.
 
-## Description
-* Simple CycleFlow-compatible app to serve as a proof-of-concept and potential example for alternative clients
-* Simulate location data
-* Decode and display CycleFlow broadcasts
+This repository consists of two components: a sample base station implementation
+using Nordic Semiconductor's nRF52-DK development kit, and a sample client
+implementation using Android. A description of the protocol can be found in
+the integration guide (in the `doc/` directory).
 
-## Requirements
-* Requires Android 5.0 or higher
-* Requires Google Play Services
-* Requires Location and Bluetooth permissions
-* Requires Google Maps API key (NOT PROVIDED)
-* For full experience, deployment of CycleFlow-compatible base stations is required.  
+More information on each project can be found in the `README.md` in the
+respective directories.
 
-## How to build
-* Import project into Android Studio
-* Any missing Android or Google dependencies can then be automatically installed
-* Build project
-* Deploy on physical Android device for best results (tested on LG V20, Samsung A5 2017, Moto G4)
+## CycleFlow Android Client
+
+The CycleFlow Android client (in `cycleflow-android/`) is a proof-of-concept
+Android application implementing the CycleFlow protocol. It can use real or
+simulated location data to decode and display information from CycleFlow base
+stations. 
+
+## CycleCaster
+
+The CycleCaster is a CycleFlow base station using the nRF52 series Bluetooth
+SoC. It can run internal timing demonstrations with static data, and is designed
+to be integrated with traffic signal control systems.
