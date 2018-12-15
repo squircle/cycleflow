@@ -2,7 +2,7 @@ PROJECT_NAME     := cyclecaster-nrf52
 TARGETS          := nrf52832_xxaa
 OUTPUT_DIRECTORY := _build
 
-SDK_ROOT := ../../../../nRF5_SDK_15.2.0_9412b96
+SDK_ROOT := ../../../../../../nRF52_SDK/nRF5_SDK_15.2.0_9412b96
 PROJ_DIR := ../../..
 
 $(OUTPUT_DIRECTORY)/nrf52832_xxaa.out: \

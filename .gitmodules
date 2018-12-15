@@ -1,0 +1,3 @@
+[submodule "nRF5_SDK"]
+	path = nRF5_SDK
+	url = git@github.com:squircle/nRF5_SDK.git
