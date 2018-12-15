@@ -34,12 +34,12 @@
 #define APP_BLE_MAX_PAYLOAD     27      /**< Maximum payload, net of GAP headers */
 #define BLE_TX_POWER            +4      /**< Transmit power of nRF52 in dBm: -40, -20, -16, -12, -8, -4, 0 (default), +3, +4 */
 
-#define DEBUG                   1   //FIXME: remove after debugging
+#define DEBUG                   1
 
 #define CF_MAGIC_NUMBER         0xCF    /**< Magic number to identify CycleFlow advertisements */
 
 #define USE_HARDCODED_NAME      1       /**< Whether to use hardcoded name or get it from SD config */
-#define HARDCODED_NAME          "ABCDEFGHIJKLMNOPQRSTUVWXYZZ" // Max length 27 chars
+#define HARDCODED_NAME          "4 St SW / 12 Ave SW" // Max length 27 chars
 
 #define TIMER_FREQUENCY_MS      1000    /**< Timer period for internal demos (ms) */
 
@@ -97,9 +97,9 @@ static ble_gap_adv_data_t  m_gap_adv_buffers[NUM_ADV_BUFFERS] =
     }
 };
 
-/**@brief Structure to hold data for each entrance of an intersection
+/**
+ * @brief Structure to hold data for each entrance of an intersection
  * 
- * //TODO: Complete documentation
  */
 typedef struct EntranceData
 {
@@ -109,9 +109,9 @@ typedef struct EntranceData
     uint8_t changeTime; /**< Time to state change (0-254 seconds, 255 is infinity) */
 } EntranceData;
 
-/**@brief Structure to hold intersection data
+/**
+ * @brief Structure to hold intersection data
  * 
- * //TODO: complete documentation
  */
 typedef struct IntersectionData 
 {
@@ -125,33 +125,33 @@ typedef struct IntersectionData
 #if STATIC_DEMO || INTERNAL_TIMER_DEMO
 static IntersectionData intersection_data = 
 {
-    .latitude = {0xC0, 0x98, 0x9C},
-    .longitude = {0x4A, 0x2D, 0xCF},
+    .latitude = {0xC8, 0x97, 0x4E},
+    .longitude = {0x2E, 0xE1, 0xD3},
     .num_entrances = 4,
     .entrances = 
     {
         {
             .demandTrigger = false,
             .isGreen = true,
-            .heading = 0x53,
+            .heading = 0x78,
             .changeTime = 0x1E
         },
         {
             .demandTrigger = false,
             .isGreen = true,
-            .heading = 0xCB,
+            .heading = 0x00,
             .changeTime = 0x1E
         },
         {
             .demandTrigger = false,
             .isGreen = false,
-            .heading = 0x1E,
+            .heading = 0x3C,
             .changeTime = 0x1E
         },
         {
             .demandTrigger = false,
             .isGreen = false,
-            .heading = 0x97,
+            .heading = 0xB4,
             .changeTime = 0x1E,
         }
     },
@@ -348,13 +348,13 @@ static void idle_state_handle(void)
 }
 
 /**
- * @brief //TODO: finish documentation
+ * @brief Sets up advertising data structures and starts advertising.
  * 
- * @param adv_frame_payload 
- * @param adv_frame_payload_length 
- * @param sr_frame_payload 
- * @param sr_frame_payload_length 
- * @param gap_pointers 
+ * @param adv_frame_payload Advertising frame payload
+ * @param adv_frame_payload_length Advertising frame payload length
+ * @param sr_frame_payload Scan response frame payload
+ * @param sr_frame_payload_length Scan response frame payload length
+ * @param gap_pointers Data structure containing GAP pointers (for advertisement)
  */
 static void advertising_setup(uint8_t * adv_frame_payload, uint16_t * adv_frame_payload_length,
                                 uint8_t * sr_frame_payload, uint16_t * sr_frame_payload_length,
@@ -420,13 +420,14 @@ static void advertising_setup(uint8_t * adv_frame_payload, uint16_t * adv_frame_
     }
 }
 
-// TODO: create documentation blocks once function prototype defined
 #if INTERNAL_TIMER_DEMO
+/**
+ * @brief Decrement all counters in i_data -- if zero, flip all status bits
+ * 
+ * @param i_data Pointer to intersection data structure
+ */
 static void decrement_and_flip_zero(IntersectionData* i_data)
 {
-    // decrement all counters in intersection_data
-    // if reached 0, flip all status bits 
-
     int i;
     uint8_t newTime;
     bool doFlipStatusBit;
@@ -451,8 +452,14 @@ static void decrement_and_flip_zero(IntersectionData* i_data)
             i_data->entrances[i].isGreen = !i_data->entrances[i].isGreen;
         }
     }
+
+    NRF_LOG_DEBUG("Demo timer: %d", newTime);
 }
 
+/**
+ * @brief Timeout handler for demo timer
+ * 
+ */
 static void demo_timer_timeout_handler()
 {
     // change timing data
@@ -469,6 +476,10 @@ static void demo_timer_timeout_handler()
     currentBuffer = (currentBuffer + 1) % NUM_ADV_BUFFERS;
 }
 
+/**
+ * @brief Set up demo timer
+ * 
+ */
 static void demo_timer_setup(void)
 {
     uint32_t err_code;
@@ -477,6 +488,10 @@ static void demo_timer_setup(void)
     APP_ERROR_CHECK(err_code);
 }
 
+/**
+ * @brief Start demo timer
+ * 
+ */
 static void demo_timer_start()
 {
     uint32_t err_code;
@@ -485,14 +500,6 @@ static void demo_timer_start()
     err_code = app_timer_start(demo_timer_id, timeout_ticks, NULL);
     APP_ERROR_CHECK(err_code);
 }
-
-// static void demo_timer_stop()
-// {
-//     uint32_t err_code;
-
-//     err_code = app_timer_stop(demo_timer_id);
-//     APP_ERROR_CHECK(err_code);
-// }
 #endif
 
 /**
@@ -506,7 +513,6 @@ int main(void)
     leds_init();
     power_management_init();
     ble_stack_init();
-    // TODO: initialize UART
 
 #if STATIC_DEMO
     // If the test structure is used, the information is static (i.e. no double-buffer
