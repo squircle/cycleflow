@@ -20,6 +20,9 @@ Developed in 2018 alongside the `cyclecaster` base station component.
 * Simulate location data
 * Decode and display CycleFlow broadcasts
 
+## Screenshot
+![Screenshot from an LG V20](https://i.imgur.com/dHqd5GV.png)
+
 ## Requirements
 * Requires Android 5.0 or higher
 * Requires Google Play Services
